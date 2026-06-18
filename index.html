@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TVC 成效分析系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1a1a2e;--ink2:#4a4a6a;--ink3:#9090b0;--bg:#f5f4f0;--sf:#fff;--bd:#e4e2dc;
+  --blue:#2563eb;--bl:#dbeafe;--bd2:#1e40af;--teal:#0d9488;--tl:#ccfbf1;
+  --amb:#d97706;--al:#fef3c7;--cor:#dc2626;--cl:#fee2e2;--pur:#7c3aed;--pl:#ede9fe;
+  --grn:#16a34a;--gl:#dcfce7;--r:8px}
+body{font-family:"Helvetica Neue",Arial,"Noto Sans TC",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6}
+
+/* TOP BAR */
+.bar{background:var(--ink);color:#fff;padding:0 16px;height:52px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;flex-wrap:nowrap}
+.bar h1{font-size:13px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.selrow{display:flex;gap:6px;align-items:center}
+.selrow label{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.bsel{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:5px;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer}
+.bsel:focus{outline:1px solid rgba(255,255,255,.5)}
+.bsel option{color:var(--ink);background:#fff}
+.tabs{display:flex;gap:2px;background:rgba(255,255,255,.1);border-radius:6px;padding:2px;margin-left:auto}
+.tb{background:none;border:none;color:rgba(255,255,255,.6);font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tb.on{background:#fff;color:var(--ink);font-weight:600}
+.tb:hover:not(.on){color:#fff;background:rgba(255,255,255,.15)}
+
+/* LAYOUT */
+.wrap{max-width:1200px;margin:0 auto;padding:14px 18px 48px}
+.panel{display:none}.panel.on{display:block}
+.frow{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:9px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.fg{display:flex;align-items:center;gap:6px}
+.fg label{font-size:10px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+select{border:1px solid var(--bd);border-radius:5px;padding:5px 9px;font-size:12px;color:var(--ink);background:var(--bg);cursor:pointer}
+select:focus{outline:2px solid var(--blue);outline-offset:1px}
+.sep{width:1px;height:22px;background:var(--bd);flex-shrink:0}
+.rbtn{background:none;border:1px solid var(--bd);border-radius:5px;padding:4px 9px;font-size:11px;color:var(--ink2);cursor:pointer}
+.rbtn:hover{border-color:var(--ink3);background:var(--bg)}
+.fhint{font-size:11px;background:var(--bl);color:var(--bd2);padding:2px 8px;border-radius:12px;font-weight:500}
+
+/* CARDS */
+.mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:12px}
+.mc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:11px 13px}
+.mc .lbl{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.mc .val{font-size:22px;font-weight:700;line-height:1.1}
+.mc .sub{font-size:10px;color:var(--ink3);margin-top:2px}
+.mc.bl .val{color:var(--blue)}.mc.tl .val{color:var(--teal)}.mc.am .val{color:var(--amb)}
+.mc.co .val{color:var(--cor)}.mc.pu .val{color:var(--pur)}.mc.gr .val{color:var(--grn)}
+
+/* CHART CARD */
+.cc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.cc h3{font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:6px}
+.tag{font-size:10px;background:var(--bl);color:var(--bd2);padding:2px 6px;border-radius:10px;font-weight:500;text-transform:none;letter-spacing:0}
+.cw{position:relative;width:100%}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.g2{grid-template-columns:1fr}}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--bg);color:var(--ink2);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:6px 9px;text-align:left;border-bottom:2px solid var(--bd);white-space:nowrap}
+td{padding:6px 9px;border-bottom:1px solid var(--bd);color:var(--ink)}
+tr:last-child td{border-bottom:none}
+tr.cl{cursor:pointer}
+tr.cl:hover td{background:var(--bl)}
+.rn{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--bl);color:var(--bd2);font-size:10px;font-weight:700}
+.rn.g1{background:#ffd700;color:#7a5c00}.rn.g2{background:#c0c0c0;color:#444}.rn.g3{background:#cd7f32;color:#4a2c00}
+.bg{display:inline-block;height:5px;border-radius:3px;background:var(--bd);vertical-align:middle;margin-left:5px;width:56px;position:relative;overflow:hidden}
+.bf{position:absolute;left:0;top:0;height:100%;border-radius:3px}
+.mn{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
+
+/* LEGEND */
+.leg{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:6px;font-size:11px;color:var(--ink2)}
+.leg span{display:flex;align-items:center;gap:4px}
+.dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* MISC */
+.note{background:var(--tl);border-left:3px solid var(--teal);border-radius:0 var(--r) var(--r) 0;padding:8px 12px;font-size:12px;color:#0f5840;margin-bottom:12px}
+.note.warn{background:var(--al);border-color:var(--amb);color:#78350f}
+.iz{border:2px dashed var(--bd);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:.2s;background:var(--sf)}
+.iz:hover{border-color:var(--blue);background:var(--bl)}
+.iz input[type=file]{display:none}
+.stag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
+.stag.ok{background:var(--gl);color:var(--grn)}.stag.er{background:var(--cl);color:var(--cor)}
+.empty{text-align:center;padding:32px;color:var(--ink3);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>TVC 成效分析</h1>
+  <div class="selrow">
+    <label>商品</label>
+    <select class="bsel" id="sel-prod" onchange="onProdChange()"><option value="">選擇商品</option></select>
+  </div>
+  <div class="selrow">
+    <label>月份</label>
+    <select class="bsel" id="sel-month" onchange="render()"><option value="all">全部</option></select>
+  </div>
+  <div class="tabs">
+    <button class="tb on" data-tab="ov" onclick="go('ov')">📊 總覽</button>
+    <button class="tb" data-tab="mt" onclick="go('mt')">🎬 素材</button>
+    <button class="tb" data-tab="ch" onclick="go('ch')">📺 頻道</button>
+    <button class="tb" data-tab="tr" onclick="go('tr')">📈 趨勢</button>
+    <button class="tb" data-tab="im" onclick="go('im')">⬆ 匯入</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- OVERVIEW -->
+<div id="p-ov" class="panel on">
+  <div class="note" id="ov-note">請從上方選擇商品與月份</div>
+  <div class="mcards" id="ov-cards"></div>
+  <div class="g2">
+    <div class="cc"><h3>各素材投遞檔次</h3><div class="cw" style="height:220px"><canvas id="c-ms" role="img" aria-label="各素材投遞檔次">投遞</canvas></div></div>
+    <div class="cc"><h3>各素材來電 / 訂單</h3><div class="cw" style="height:220px"><canvas id="c-mc" role="img" aria-label="各素材來電訂單">來電</canvas></div></div>
+  </div>
+  <div class="cc"><h3>每日投遞趨勢</h3><div class="leg" id="leg-ov"></div><div class="cw" style="height:180px"><canvas id="c-ds" role="img" aria-label="每日投遞趨勢">趨勢</canvas></div></div>
+  <div class="cc"><h3>素材效益總表 <span style="font-size:10px;color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0">點擊列 → 素材分析</span></h3><div class="tw"><table id="t-ov"></table></div></div>
+</div>
+
+<!-- MATERIAL -->
+<div id="p-mt" class="panel">
+  <div class="frow">
+    <div class="fg"><label>素材</label><select id="s-mt" onchange="rMt()"><option value="">全部</option></select></div>
+    <div class="sep"></div>
+    <div class="fg"><label>排序</label>
+      <select id="s-mm" onchange="rMt()">
+        <option value="s">投遞檔次</option><option value="tvr">TVR</option>
+        <option value="tc">來電數</option><option value="o">訂單數</option>
+      </select>
+    </div>
+    <button class="rbtn" onclick="rset('s-mt','');rset('s-mm','s');rMt()">↺ 重設</button>
+    <span id="fh-mt" class="fhint" style="display:none"></span>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3 id="h-mtr">效益排行</h3><div class="tw"><table id="t-mt"></table></div></div>
+    <div class="cc"><h3 id="h-mch">頻道分布</h3><div class="cw" style="height:300px"><canvas id="c-mch" role="img" aria-label="頻道分布">頻道</canvas></div></div>
+  </div>
+  <div class="cc"><h3 id="h-mdt">每日投遞趨勢</h3><div class="cw" style="height:200px"><canvas id="c-mdt" role="img" aria-label="每日趨勢">趨勢</canvas></div></div>
+</div>
+
+<!-- CHANNEL -->
+<div id="p-ch" class="panel">
+  <div class="frow">
+    <div class="fg"><label>頻道</label><select id="s-ch" onchange="rCh()"><option value="">全部</option></select></div>
+    <div class="sep"></div>
+    <div class="fg"><label>素材</label><select id="s-chm" onchange="updChSel();rCh()"><option value="">全部</option></select></div>
+    <button class="rbtn" onclick="rset('s-ch','');rset('s-chm','');updChSel();rCh()">↺ 重設</button>
+    <span id="fh-ch" class="fhint" style="display:none"></span>
+  </div>
+  <div class="mcards" id="ch-cards"></div>
+  <div class="cc">
+    <h3 id="h-ch-d">頻道每日投遞 / TVR / 來電</h3>
+    <div class="leg" id="leg-ch-d"></div>
+    <div class="cw" style="height:230px"><canvas id="c-ch-d" role="img" aria-label="頻道每日趨勢">日趨勢</canvas></div>
+  </div>
+  <div class="g2">
+    <div class="cc">
+      <h3 id="h-ch-t">時段投遞 / TVR / 來電</h3>
+      <div class="cw" style="height:250px"><canvas id="c-ch-t" role="img" aria-label="時段分布">時段</canvas></div>
+    </div>
+    <div class="cc"><h3>頻道效益排行</h3><div class="tw"><table id="t-ch"></table></div></div>
+  </div>
+  <div id="prog-section" style="display:none">
+    <div class="g2">
+      <div class="cc"><h3 id="h-prog-s">節目排行 — 投遞檔次</h3><div class="tw"><table id="t-prog-s"></table></div></div>
+      <div class="cc"><h3 id="h-prog-t">節目排行 — 收視最高</h3><div class="tw"><table id="t-prog-t"></table></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TREND -->
+<div id="p-tr" class="panel">
+  <div class="frow">
+    <div class="fg"><label>素材</label><select id="s-trm" onchange="updTrChSel();rTr()"><option value="">全部</option></select></div>
+    <div class="sep"></div>
+    <div class="fg"><label>頻道</label><select id="s-trc" onchange="rTr()"><option value="">全部</option></select></div>
+    <button class="rbtn" onclick="rset('s-trm','');rset('s-trc','');updTrChSel();rTr()">↺ 重設</button>
+  </div>
+  <div class="cc">
+    <h3>每日投遞 / TVR / 來電 / 訂單</h3>
+    <div class="leg" id="leg-tr"></div>
+    <div class="cw" style="height:260px"><canvas id="c-tr" role="img" aria-label="投遞來電趨勢">趨勢</canvas></div>
+  </div>
+  <div class="cc">
+    <h3>每日來電分布（依素材）</h3>
+    <div class="leg" id="leg-cs"></div>
+    <div class="cw" style="height:190px"><canvas id="c-cs" role="img" aria-label="每日來電堆疊">來電堆疊</canvas></div>
+  </div>
+</div>
+
+<!-- IMPORT -->
+<div id="p-im" class="panel">
+  <div style="max-width:700px">
+    <div class="cc" style="margin-bottom:12px">
+      <h3>已載入資料</h3>
+      <div id="im-status-wrap"></div>
+    </div>
+    <div class="cc" style="margin-bottom:12px">
+      <h3>匯入新資料</h3>
+      <div class="frow" style="margin-bottom:12px">
+        <div class="fg"><label>商品</label>
+          <select id="im-prod">
+            <option value="EX">芝麻明EX</option>
+            <option value="E">芝麻明E</option>
+            <option value="GL">固力伸</option>
+            <option value="OTHER">其他</option>
+          </select>
+        </div>
+        <div class="fg"><label>商品名稱（其他時填）</label>
+          <input type="text" id="im-prod-name" placeholder="例：固力伸" style="border:1px solid var(--bd);border-radius:5px;padding:5px 9px;font-size:12px;width:120px">
+        </div>
+        <div class="fg"><label>月份</label>
+          <input type="month" id="im-month" style="border:1px solid var(--bd);border-radius:5px;padding:5px 9px;font-size:12px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <p style="font-size:10px;font-weight:600;color:var(--ink2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px">監播表 CSV</p>
+          <div class="iz" onclick="document.getElementById('f-bc').click()">
+            <input type="file" id="f-bc" accept=".csv" onchange="hBC(event)">
+            <div style="font-size:22px;margin-bottom:4px">📡</div>
+            <strong style="display:block;font-size:12px;margin-bottom:2px">點擊上傳監播 CSV</strong>
+            <p style="font-size:10px;color:var(--ink2)">欄位：素材,日期,頻道代碼,頻道名稱,檔次數,TVR</p>
+          </div>
+          <div id="msg-bc" style="margin-top:6px;font-size:11px"></div>
+        </div>
+        <div>
+          <p style="font-size:10px;font-weight:600;color:var(--ink2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px">來電報表 CSV</p>
+          <div class="iz" onclick="document.getElementById('f-call').click()">
+            <input type="file" id="f-call" accept=".csv" onchange="hCall(event)">
+            <div style="font-size:22px;margin-bottom:4px">📞</div>
+            <strong style="display:block;font-size:12px;margin-bottom:2px">點擊上傳來電 CSV</strong>
+            <p style="font-size:10px;color:var(--ink2)">欄位：日期,電話,總來電,有效來電,訂單數,包數</p>
+          </div>
+          <div id="msg-call" style="margin-top:6px;font-size:11px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cc">
+      <h3>電話號碼對應設定</h3>
+      <p style="font-size:11px;color:var(--ink2);margin-bottom:8px">匯入新商品時，設定電話號碼與素材的對應關係：</p>
+      <div id="phone-map-editor"></div>
+      <button class="rbtn" style="margin-top:8px" onclick="addPhoneRow()">+ 新增對應</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- wrap -->
+
+<script>
+// ============================================================
+// DATA STORE
+// ============================================================
+var DB = {"products":{"EX":{"name":"芝麻明EX","phoneMap":{"070-585":"070585天之音15天A300","358-853":"358853全武杭300","888-837":"888837完睡探案300","357-753":"357753今晚能睡300","455-555":"455555生芝麻60","030-036":"030036生芝麻B60","777-001":"777001百醫活動60","030-335":"030335百醫活動B60","070-583":"070583天公保庇60","888-237":"888237一訂睡好60"},"months":{"202605":{"matTotals":{"455555生芝麻60":{"s":447,"tvr":29.25},"777001百醫活動60":{"s":1253,"tvr":89.39},"070583天公保庇60":{"s":146,"tvr":6.39},"888237一訂睡好60":{"s":9,"tvr":0.03},"030036生芝麻B60":{"s":483,"tvr":9.68},"030335百醫活動B60":{"s":161,"tvr":59.4},"358853全武杭300":{"s":36,"tvr":6.76},"888837完睡探案300":{"s":1,"tvr":0.13},"070585天之音15天A300":{"s":18,"tvr":5.04},"357753今晚能睡300":{"s":30,"tvr":3.02}},"dailyMat":{"2026/05/01":{"455555生芝麻60":30,"777001百醫活動60":9,"888237一訂睡好60":9,"357753今晚能睡300":2},"2026/05/04":{"455555生芝麻60":12,"777001百醫活動60":34,"070583天公保庇60":5,"358853全武杭300":1,"070585天之音15天A300":2,"357753今晚能睡300":1},"2026/05/05":{"455555生芝麻60":8,"777001百醫活動60":41,"070583天公保庇60":4,"030036生芝麻B60":26,"358853全武杭300":3,"357753今晚能睡300":4},"2026/05/06":{"455555生芝麻60":13,"777001百醫活動60":37,"070583天公保庇60":4,"030036生芝麻B60":40,"358853全武杭300":2,"357753今晚能睡300":2},"2026/05/07":{"455555生芝麻60":14,"777001百醫活動60":39,"070583天公保庇60":7,"030036生芝麻B60":40,"358853全武杭300":1,"357753今晚能睡300":3},"2026/05/08":{"455555生芝麻60":12,"777001百醫活動60":35,"070583天公保庇60":6,"030036生芝麻B60":20,"358853全武杭300":2,"357753今晚能睡300":1},"2026/05/09":{"455555生芝麻60":18,"777001百醫活動60":37,"070583天公保庇60":4,"030036生芝麻B60":20,"358853全武杭300":1,"070585天之音15天A300":1,"357753今晚能睡300":2},"2026/05/10":{"455555生芝麻60":19,"777001百醫活動60":38,"070583天公保庇60":4,"030036生芝麻B60":11,"358853全武杭300":2},"2026/05/11":{"455555生芝麻60":11,"777001百醫活動60":41,"070583天公保庇60":6,"030036生芝麻B60":11,"358853全武杭300":1,"070585天之音15天A300":3,"357753今晚能睡300":1},"2026/05/12":{"455555生芝麻60":16,"777001百醫活動60":40,"070583天公保庇60":6,"030036生芝麻B60":10,"358853全武杭300":2,"070585天之音15天A300":1,"357753今晚能睡300":2},"2026/05/13":{"455555生芝麻60":12,"777001百醫活動60":51,"070583天公保庇60":6,"030036生芝麻B60":10,"358853全武杭300":1,"070585天之音15天A300":1,"357753今晚能睡300":1},"2026/05/14":{"455555生芝麻60":15,"777001百醫活動60":48,"070583天公保庇60":6,"030036生芝麻B60":8,"358853全武杭300":1,"070585天之音15天A300":1,"357753今晚能睡300":2},"2026/05/15":{"455555生芝麻60":15,"777001百醫活動60":38,"070583天公保庇60":6,"030036生芝麻B60":10,"070585天之音15天A300":1},"2026/05/16":{"455555生芝麻60":20,"777001百醫活動60":33,"070583天公保庇60":3,"030036生芝麻B60":24,"358853全武杭300":1,"357753今晚能睡300":2},"2026/05/17":{"455555生芝麻60":21,"777001百醫活動60":33,"070583天公保庇60":4,"030036生芝麻B60":24,"358853全武杭300":2},"2026/05/18":{"455555生芝麻60":15,"777001百醫活動60":44,"070583天公保庇60":6,"030036生芝麻B60":29,"030335百醫活動B60":11,"358853全武杭300":1,"070585天之音15天A300":1,"357753今晚能睡300":1},"2026/05/19":{"455555生芝麻60":16,"777001百醫活動60":47,"070583天公保庇60":7,"030036生芝麻B60":27,"030335百醫活動B60":12,"358853全武杭300":1,"070585天之音15天A300":2,"357753今晚能睡300":1},"2026/05/20":{"455555生芝麻60":15,"777001百醫活動60":52,"070583天公保庇60":6,"030036生芝麻B60":28,"030335百醫活動B60":11,"070585天之音15天A300":1},"2026/05/21":{"455555生芝麻60":15,"777001百醫活動60":47,"070583天公保庇60":6,"030036生芝麻B60":26,"030335百醫活動B60":11,"358853全武杭300":1},"2026/05/22":{"455555生芝麻60":15,"777001百醫活動60":50,"070583天公保庇60":6,"030036生芝麻B60":21,"030335百醫活動B60":11,"070585天之音15天A300":1},"2026/05/23":{"455555生芝麻60":20,"777001百醫活動60":51,"070583天公保庇60":3,"030036生芝麻B60":20,"030335百醫活動B60":13,"357753今晚能睡300":1},"2026/05/24":{"455555生芝麻60":19,"777001百醫活動60":51,"070583天公保庇60":3,"030036生芝麻B60":18,"030335百醫活動B60":14,"070585天之音15天A300":2},"2026/05/25":{"455555生芝麻60":15,"777001百醫活動60":54,"070583天公保庇60":6,"030036生芝麻B60":21,"030335百醫活動B60":12,"358853全武杭300":1},"2026/05/26":{"455555生芝麻60":16,"777001百醫活動60":46,"070583天公保庇60":6,"030036生芝麻B60":6,"030335百醫活動B60":11,"358853全武杭300":3},"2026/05/27":{"455555生芝麻60":13,"777001百醫活動60":56,"070583天公保庇60":6,"030036生芝麻B60":7,"030335百醫活動B60":11,"358853全武杭300":1,"357753今晚能睡300":1},"2026/05/28":{"455555生芝麻60":12,"777001百醫活動60":53,"070583天公保庇60":6,"030036生芝麻B60":6,"030335百醫活動B60":11},"2026/05/29":{"455555生芝麻60":13,"777001百醫活動60":53,"070583天公保庇60":6,"030036生芝麻B60":7,"030335百醫活動B60":11,"358853全武杭300":1},"2026/05/30":{"455555生芝麻60":14,"777001百醫活動60":46,"070583天公保庇60":4,"030036生芝麻B60":7,"030335百醫活動B60":11,"358853全武杭300":1,"357753今晚能睡300":1},"2026/05/31":{"455555生芝麻60":13,"777001百醫活動60":49,"070583天公保庇60":4,"030036生芝麻B60":6,"030335百醫活動B60":11,"358853全武杭300":3,"070585天之音15天A300":1},"2026/05/02":{"358853全武杭300":1,"357753今晚能睡300":1},"2026/05/03":{"358853全武杭300":2,"888837完睡探案300":1,"357753今晚能睡300":1}},"chTotals":{"DISCV":{"name":"探索頻道","s":151,"tvr":4.04},"ANIMA":{"name":"動物星球","s":128,"tvr":3.73},"TLC":{"name":"旅遊生活頻道","s":130,"tvr":0.68},"CTV-N":{"name":"中視新聞台","s":118,"tvr":25.55},"FTVT":{"name":"民視台灣台","s":111,"tvr":1.04},"FTV1":{"name":"民視第一台","s":59,"tvr":3.44},"CTV-B":{"name":"中視菁采台","s":66,"tvr":1.35},"CTV-C":{"name":"中視經典台","s":109,"tvr":2.94},"TVBSG":{"name":"TVBS歡樂台","s":50,"tvr":3.01},"ET-D":{"name":"東森戲劇台","s":138,"tvr":11.19},"VLD":{"name":"緯來戲劇台","s":181,"tvr":11.63},"VLJP":{"name":"緯來日本","s":104,"tvr":6.12},"ETTV":{"name":"東森綜合","s":64,"tvr":5.97},"GTV-1":{"name":"GTV第一台","s":179,"tvr":10.68},"STV":{"name":"超級電視","s":28,"tvr":2.75},"MUCH":{"name":"MUCH","s":231,"tvr":11.75},"ONTV":{"name":"緯來綜合","s":163,"tvr":13.91},"GTV-D":{"name":"GTV戲劇台","s":106,"tvr":12.27},"CP":{"name":"CATCHPLAY","s":34,"tvr":1.51},"HLYWD":{"name":"好萊塢電影","s":112,"tvr":4.88},"DAZN2":{"name":"DAZN 2","s":68,"tvr":1.1},"DAZN1":{"name":"DAZN 1","s":54,"tvr":0.73},"UBN":{"name":"非凡新聞","s":47,"tvr":27.71},"TVBS":{"name":"TVBS","s":17,"tvr":3.9},"CTS-N":{"name":"華視新聞資訊台","s":74,"tvr":13.22},"TVBSN":{"name":"TVBS新聞台","s":28,"tvr":15.59},"ERA-N":{"name":"年代新聞台","s":3,"tvr":0.3},"SANLI":{"name":"三立台灣","s":1,"tvr":0.09},"TTV":{"name":"台視","s":2,"tvr":0.16},"CTV":{"name":"中視","s":9,"tvr":5.53},"FTV":{"name":"民視","s":4,"tvr":1.1},"MOMOV":{"name":"MOMO綜合台","s":4,"tvr":0.0},"TTV-G":{"name":"台視綜合台","s":5,"tvr":0.28},"CTS":{"name":"華視","s":1,"tvr":0.06},"UF":{"name":"寰宇財經","s":4,"tvr":0.7},"TTV-F":{"name":"台視財經台","s":1,"tvr":0.18}},"chMat":{"455555生芝麻60":{"探索頻道":{"s":10,"tvr":0.3},"動物星球":{"s":10,"tvr":0.14},"旅遊生活頻道":{"s":10,"tvr":0.02},"中視新聞台":{"s":86,"tvr":21.19},"民視台灣台":{"s":109,"tvr":1.04},"民視第一台":{"s":47,"tvr":2.27},"中視菁采台":{"s":66,"tvr":1.35},"中視經典台":{"s":109,"tvr":2.94}},"777001百醫活動60":{"動物星球":{"s":3,"tvr":0.09},"旅遊生活頻道":{"s":3,"tvr":0.0},"探索頻道":{"s":3,"tvr":0.02},"TVBS歡樂台":{"s":50,"tvr":3.01},"東森戲劇台":{"s":138,"tvr":11.19},"緯來戲劇台":{"s":181,"tvr":11.63},"緯來日本":{"s":104,"tvr":6.12},"東森綜合":{"s":64,"tvr":5.97},"GTV第一台":{"s":179,"tvr":10.68},"超級電視":{"s":28,"tvr":2.75},"MUCH":{"s":231,"tvr":11.75},"緯來綜合":{"s":163,"tvr":13.91},"GTV戲劇台":{"s":106,"tvr":12.27}},"070583天公保庇60":{"CATCHPLAY":{"s":34,"tvr":1.51},"好萊塢電影":{"s":112,"tvr":4.88}},"888237一訂睡好60":{"旅遊生活頻道":{"s":3,"tvr":0.0},"探索頻道":{"s":3,"tvr":0.03},"動物星球":{"s":3,"tvr":0.0}},"030036生芝麻B60":{"DAZN 2":{"s":68,"tvr":1.1},"旅遊生活頻道":{"s":114,"tvr":0.66},"動物星球":{"s":112,"tvr":3.5},"探索頻道":{"s":135,"tvr":3.69},"DAZN 1":{"s":54,"tvr":0.73}},"030335百醫活動B60":{"非凡新聞":{"s":46,"tvr":27.24},"TVBS":{"s":14,"tvr":3.4},"華視新聞資訊台":{"s":73,"tvr":13.17},"TVBS新聞台":{"s":28,"tvr":15.59}},"358853全武杭300":{"中視新聞台":{"s":14,"tvr":1.78},"TVBS":{"s":2,"tvr":0.36},"年代新聞台":{"s":2,"tvr":0.23},"三立台灣":{"s":1,"tvr":0.09},"民視台灣台":{"s":1,"tvr":0.0},"台視":{"s":1,"tvr":0.11},"非凡新聞":{"s":1,"tvr":0.47},"民視第一台":{"s":3,"tvr":0.26},"中視":{"s":5,"tvr":2.26},"民視":{"s":3,"tvr":1.03},"MOMO綜合台":{"s":1,"tvr":0.0},"台視綜合台":{"s":2,"tvr":0.17}},"888837完睡探案300":{"中視新聞台":{"s":1,"tvr":0.13}},"070585天之音15天A300":{"華視":{"s":1,"tvr":0.06},"中視新聞台":{"s":6,"tvr":1.24},"華視新聞資訊台":{"s":1,"tvr":0.05},"台視綜合台":{"s":1,"tvr":0.03},"民視第一台":{"s":2,"tvr":0.17},"中視":{"s":3,"tvr":3.21},"TVBS":{"s":1,"tvr":0.14},"年代新聞台":{"s":1,"tvr":0.07},"MOMO綜合台":{"s":1,"tvr":0.0},"民視":{"s":1,"tvr":0.07}},"357753今晚能睡300":{"中視新聞台":{"s":11,"tvr":1.21},"民視第一台":{"s":7,"tvr":0.74},"寰宇財經":{"s":4,"tvr":0.7},"台視綜合台":{"s":2,"tvr":0.08},"中視":{"s":1,"tvr":0.06},"民視台灣台":{"s":1,"tvr":0.0},"台視":{"s":1,"tvr":0.05},"MOMO綜合台":{"s":2,"tvr":0.0},"台視財經台":{"s":1,"tvr":0.18}}},"callMat":{"455-555":{"tc":73,"vc":45,"o":30,"pk":45},"030-036":{"tc":20,"vc":10,"o":8,"pk":14},"358-853":{"tc":174,"vc":131,"o":71,"pk":115},"357-753":{"tc":32,"vc":22,"o":15,"pk":24},"258-853":{"tc":6,"vc":2,"o":1,"pk":1},"777-001":{"tc":131,"vc":97,"o":64,"pk":107},"030-335":{"tc":56,"vc":34,"o":23,"pk":39},"070-585":{"tc":66,"vc":51,"o":37,"pk":55},"070-583":{"tc":11,"vc":6,"o":3,"pk":4},"777-508":{"tc":4,"vc":0,"o":0,"pk":0},"888-837":{"tc":8,"vc":3,"o":2,"pk":2},"888-237":{"tc":2,"vc":0,"o":0,"pk":0}},"dailyCalls":{"2026/05/01":{"455-555":2,"030-036":1},"2026/05/02":{"358-853":8,"357-753":5,"455-555":1},"2026/05/03":{"358-853":11,"258-853":2,"357-753":2,"030-036":1,"777-001":1,"030-335":1},"2026/05/04":{"070-585":2,"358-853":12,"357-753":1,"455-555":3,"777-001":1,"070-583":3},"2026/05/05":{"070-585":3,"358-853":6,"357-753":4,"455-555":2,"030-036":2,"777-001":6},"2026/05/06":{"070-585":1,"358-853":12,"357-753":5,"455-555":4,"030-036":5,"777-001":3,"070-583":1},"2026/05/07":{"358-853":6,"777-508":1,"455-555":5,"030-036":2,"777-001":4,"030-335":1},"2026/05/08":{"358-853":5,"888-837":1,"357-753":1,"455-555":1},"2026/05/09":{"358-853":7,"777-508":1,"357-753":5,"030-036":2,"777-001":5},"2026/05/10":{"358-853":15,"455-555":1,"030-036":2,"777-001":8,"030-335":1},"2026/05/11":{"070-585":3,"358-853":13,"258-853":1,"455-555":1,"030-036":1,"777-001":6,"888-237":1},"2026/05/12":{"358-853":7,"357-753":2,"455-555":3,"777-001":5},"2026/05/13":{"070-585":4,"358-853":6,"888-837":1,"455-555":1,"777-001":6,"030-335":1},"2026/05/14":{"070-585":4,"358-853":3,"258-853":1,"455-555":8,"777-001":3,"070-583":1},"2026/05/15":{"070-585":12,"455-555":3,"777-001":4},"2026/05/16":{"358-853":6,"888-837":1,"455-555":4,"030-036":1,"777-001":1},"2026/05/17":{"358-853":12,"455-555":2,"777-001":2},"2026/05/18":{"358-853":9,"777-508":1,"455-555":3,"777-001":8,"030-335":2},"2026/05/19":{"070-585":9,"358-853":1,"357-753":1,"455-555":1,"030-036":1,"777-001":5,"030-335":1,"070-583":1},"2026/05/20":{"070-585":2,"358-853":1,"455-555":1,"777-001":5,"030-335":2},"2026/05/21":{"070-585":1,"358-853":2,"357-753":1,"455-555":3,"030-036":1,"777-001":7,"030-335":2},"2026/05/22":{"777-001":6,"030-335":6},"2026/05/23":{"070-585":1,"358-853":2,"357-753":2,"455-555":5,"777-001":2,"030-335":3,"070-583":1},"2026/05/24":{"070-585":14,"358-853":1,"455-555":3,"777-001":2,"030-335":3,"888-237":1},"2026/05/25":{"070-585":1,"358-853":10,"777-001":7,"030-335":5},"2026/05/26":{"358-853":7,"455-555":1,"777-001":3,"030-335":5,"070-583":3},"2026/05/27":{"358-853":2,"455-555":3,"777-001":3,"030-335":3},"2026/05/28":{"070-585":2,"358-853":1,"888-837":1,"777-508":1,"258-853":1,"357-753":2,"455-555":7,"030-036":1,"777-001":8,"030-335":9,"070-583":1},"2026/05/29":{"070-585":1,"358-853":7,"888-837":1,"455-555":3,"777-001":7,"030-335":2},"2026/05/30":{"358-853":2,"888-837":1,"258-853":1,"357-753":1,"777-001":5,"030-335":3},"2026/05/31":{"070-585":6,"888-837":2,"455-555":2,"777-001":8,"030-335":6}},"dailyCC":{"2026/05/01":{"DISCV":{"s":16,"tvr":0.35},"ANIMA":{"s":16,"tvr":0.23},"TLC":{"s":16,"tvr":0.02},"CTV-N":{"s":2,"tvr":0.24}},"2026/05/04":{"CTV-N":{"s":3,"tvr":0.53},"FTVT":{"s":2,"tvr":0.0},"FTV1":{"s":4,"tvr":0.09},"CTV-B":{"s":3,"tvr":0.06},"CTV-C":{"s":2,"tvr":0.04},"TVBSG":{"s":3,"tvr":0.08},"ET-D":{"s":4,"tvr":0.29},"VLD":{"s":5,"tvr":0.27},"VLJP":{"s":6,"tvr":0.31},"ETTV":{"s":2,"tvr":0.22},"GTV-1":{"s":2,"tvr":0.02},"STV":{"s":1,"tvr":0.05},"MUCH":{"s":4,"tvr":0.22},"ONTV":{"s":5,"tvr":0.5},"GTV-D":{"s":2,"tvr":0.25},"CP":{"s":3,"tvr":0.22},"HLYWD":{"s":2,"tvr":0.05},"ERA-N":{"s":1,"tvr":0.11},"CTS":{"s":1,"tvr":0.06}},"2026/05/05":{"FTVT":{"s":4,"tvr":0.08},"CTV-C":{"s":3,"tvr":0.14},"CTV-B":{"s":2,"tvr":0.04},"MUCH":{"s":8,"tvr":0.45},"VLJP":{"s":6,"tvr":0.62},"VLD":{"s":5,"tvr":0.64},"ET-D":{"s":5,"tvr":0.28},"GTV-1":{"s":3,"tvr":0.06},"ONTV":{"s":6,"tvr":0.26},"GTV-D":{"s":3,"tvr":0.25},"STV":{"s":1,"tvr":0.12},"ETTV":{"s":2,"tvr":0.26},"TVBSG":{"s":2,"tvr":0.03},"CP":{"s":2,"tvr":0.1},"HLYWD":{"s":2,"tvr":0.02},"DAZN2":{"s":2,"tvr":0.14},"TLC":{"s":6,"tvr":0.02},"ANIMA":{"s":6,"tvr":0.23},"DISCV":{"s":10,"tvr":0.39},"DAZN1":{"s":2,"tvr":0.0},"SANLI":{"s":1,"tvr":0.09},"CTV-N":{"s":1,"tvr":0.14},"UF":{"s":2,"tvr":0.35},"TTV-G":{"s":1,"tvr":0.04},"FTV1":{"s":1,"tvr":0.16}},"2026/05/06":{"FTV1":{"s":2,"tvr":0.11},"CTV-N":{"s":3,"tvr":0.55},"FTVT":{"s":3,"tvr":0.02},"CTV-C":{"s":4,"tvr":0.23},"CTV-B":{"s":2,"tvr":0.0},"GTV-D":{"s":3,"tvr":0.37},"ET-D":{"s":4,"tvr":0.29},"ONTV":{"s":7,"tvr":0.84},"VLJP":{"s":6,"tvr":0.32},"GTV-1":{"s":3,"tvr":0.14},"VLD":{"s":5,"tvr":0.24},"ETTV":{"s":2,"tvr":0.15},"TVBSG":{"s":3,"tvr":0.36},"STV":{"s":1,"tvr":0.02},"MUCH":{"s":3,"tvr":0.05},"HLYWD":{"s":3,"tvr":0.14},"CP":{"s":1,"tvr":0.0},"DAZN2":{"s":2,"tvr":0.04},"DAZN1":{"s":7,"tvr":0.09},"TLC":{"s":9,"tvr":0.0},"ANIMA":{"s":5,"tvr":0.03},"DISCV":{"s":17,"tvr":0.44},"TTV":{"s":1,"tvr":0.11},"UBN":{"s":1,"tvr":0.47},"TTV-G":{"s":1,"tvr":0.04}},"2026/05/07":{"CTV-C":{"s":4,"tvr":0.0},"FTVT":{"s":4,"tvr":0.0},"CTV-N":{"s":4,"tvr":0.51},"CTV-B":{"s":4,"tvr":0.02},"GTV-D":{"s":3,"tvr":0.23},"ONTV":{"s":5,"tvr":0.36},"VLD":{"s":5,"tvr":0.12},"GTV-1":{"s":3,"tvr":0.09},"ET-D":{"s":5,"tvr":0.4},"MUCH":{"s":6,"tvr":0.29},"STV":{"s":1,"tvr":0.1},"TVBSG":{"s":3,"tvr":0.17},"VLJP":{"s":6,"tvr":0.2},"ETTV":{"s":2,"tvr":0.23},"CP":{"s":2,"tvr":0.06},"HLYWD":{"s":5,"tvr":0.07},"ANIMA":{"s":10,"tvr":0.47},"TLC":{"s":10,"tvr":0.06},"DAZN2":{"s":2,"tvr":0.0},"DISCV":{"s":17,"tvr":0.51},"DAZN1":{"s":1,"tvr":0.0},"UF":{"s":1,"tvr":0.09},"FTV1":{"s":1,"tvr":0.19}},"2026/05/08":{"CTV-C":{"s":5,"tvr":0.18},"FTVT":{"s":2,"tvr":0.0},"FTV1":{"s":3,"tvr":0.34},"CTV-N":{"s":1,"tvr":0.27},"CTV-B":{"s":3,"tvr":0.08},"GTV-1":{"s":3,"tvr":0.2},"MUCH":{"s":5,"tvr":0.24},"GTV-D":{"s":3,"tvr":0.41},"ET-D":{"s":4,"tvr":0.5},"ONTV":{"s":6,"tvr":0.53},"VLJP":{"s":6,"tvr":0.37},"VLD":{"s":4,"tvr":0.19},"STV":{"s":1,"tvr":0.12},"ETTV":{"s":2,"tvr":0.09},"TVBSG":{"s":1,"tvr":0.19},"HLYWD":{"s":5,"tvr":0.26},"CP":{"s":1,"tvr":0.07},"ANIMA":{"s":5,"tvr":0.26},"DISCV":{"s":7,"tvr":0.07},"TLC":{"s":5,"tvr":0.0},"DAZN1":{"s":1,"tvr":0.0},"DAZN2":{"s":2,"tvr":0.1},"CTV":{"s":1,"tvr":0.83}},"2026/05/09":{"CTV-C":{"s":6,"tvr":0.1},"FTVT":{"s":6,"tvr":0.02},"CTV-N":{"s":6,"tvr":1.25},"CTV-B":{"s":3,"tvr":0.09},"ONTV":{"s":5,"tvr":0.46},"VLD":{"s":8,"tvr":1.07},"GTV-D":{"s":3,"tvr":0.07},"ET-D":{"s":4,"tvr":0.36},"VLJP":{"s":5,"tvr":0.45},"MUCH":{"s":6,"tvr":0.08},"GTV-1":{"s":3,"tvr":0.3},"ETTV":{"s":1,"tvr":0.07},"STV":{"s":1,"tvr":0.32},"TVBSG":{"s":1,"tvr":0.0},"HLYWD":{"s":3,"tvr":0.21},"CP":{"s":1,"tvr":0.02},"DAZN2":{"s":2,"tvr":0.0},"TLC":{"s":5,"tvr":0.09},"DISCV":{"s":6,"tvr":0.16},"ANIMA":{"s":5,"tvr":0.14},"DAZN1":{"s":2,"tvr":0.0},"CTV":{"s":1,"tvr":0.06}},"2026/05/10":{"CTV-N":{"s":2,"tvr":0.51},"FTV1":{"s":2,"tvr":0.04},"FTVT":{"s":6,"tvr":0.27},"CTV-C":{"s":5,"tvr":0.16},"CTV-B":{"s":4,"tvr":0.03},"VLJP":{"s":5,"tvr":0.59},"GTV-D":{"s":3,"tvr":0.13},"ET-D":{"s":4,"tvr":0.22},"GTV-1":{"s":3,"tvr":0.19},"VLD":{"s":8,"tvr":0.85},"MUCH":{"s":6,"tvr":0.3},"ONTV":{"s":6,"tvr":0.42},"ETTV":{"s":1,"tvr":0.0},"STV":{"s":1,"tvr":0.13},"TVBSG":{"s":1,"tvr":0.07},"CP":{"s":1,"tvr":0.2},"HLYWD":{"s":3,"tvr":0.19},"DISCV":{"s":2,"tvr":0.0},"ANIMA":{"s":3,"tvr":0.15},"TLC":{"s":2,"tvr":0.02},"DAZN2":{"s":2,"tvr":0.03},"DAZN1":{"s":2,"tvr":0.02},"FTV":{"s":2,"tvr":0.72}},"2026/05/11":{"FTV1":{"s":1,"tvr":0.04},"CTV-N":{"s":3,"tvr":0.41},"CTV-B":{"s":2,"tvr":0.0},"FTVT":{"s":3,"tvr":0.03},"CTV-C":{"s":4,"tvr":0.16},"ONTV":{"s":7,"tvr":0.48},"VLD":{"s":9,"tvr":0.43},"ET-D":{"s":5,"tvr":0.44},"GTV-1":{"s":3,"tvr":0.06},"VLJP":{"s":5,"tvr":0.04},"MUCH":{"s":5,"tvr":0.33},"GTV-D":{"s":3,"tvr":0.42},"TVBSG":{"s":1,"tvr":0.12},"ETTV":{"s":2,"tvr":0.16},"STV":{"s":1,"tvr":0.34},"HLYWD":{"s":5,"tvr":0.17},"CP":{"s":1,"tvr":0.04},"DISCV":{"s":2,"tvr":0.1},"TLC":{"s":2,"tvr":0.0},"ANIMA":{"s":3,"tvr":0.12},"DAZN2":{"s":2,"tvr":0.0},"DAZN1":{"s":2,"tvr":0.02},"FTV":{"s":1,"tvr":0.31},"CTS-N":{"s":1,"tvr":0.05},"TTV-G":{"s":1,"tvr":0.03}},"2026/05/12":{"CTV-N":{"s":4,"tvr":0.75},"CTV-C":{"s":5,"tvr":0.04},"FTV1":{"s":2,"tvr":0.03},"FTVT":{"s":4,"tvr":0.02},"CTV-B":{"s":2,"tvr":0.11},"MUCH":{"s":4,"tvr":0.35},"VLD":{"s":8,"tvr":0.8},"GTV-D":{"s":3,"tvr":0.45},"ET-D":{"s":4,"tvr":0.49},"VLJP":{"s":5,"tvr":0.15},"ONTV":{"s":8,"tvr":0.45},"GTV-1":{"s":3,"tvr":0.1},"TVBSG":{"s":2,"tvr":0.19},"ETTV":{"s":2,"tvr":0.27},"STV":{"s":1,"tvr":0.0},"HLYWD":{"s":5,"tvr":0.29},"CP":{"s":1,"tvr":0.02},"DAZN2":{"s":2,"tvr":0.03},"DAZN1":{"s":2,"tvr":0.0},"TLC":{"s":2,"tvr":0.0},"ANIMA":{"s":2,"tvr":0.09},"DISCV":{"s":2,"tvr":0.05},"MOMOV":{"s":1,"tvr":0.0},"CTV":{"s":1,"tvr":0.09},"TTV":{"s":1,"tvr":0.05},"UF":{"s":1,"tvr":0.26}},"2026/05/13":{"CTV-B":{"s":2,"tvr":0.0},"CTV-C":{"s":4,"tvr":0.1},"FTV1":{"s":2,"tvr":0.06},"FTVT":{"s":2,"tvr":0.0},"CTV-N":{"s":2,"tvr":0.32},"GTV-1":{"s":3,"tvr":0.03},"ONTV":{"s":14,"tvr":1.06},"VLD":{"s":8,"tvr":0.53},"ET-D":{"s":5,"tvr":0.39},"GTV-D":{"s":3,"tvr":0.41},"MUCH":{"s":7,"tvr":0.32},"VLJP":{"s":6,"tvr":0.09},"STV":{"s":1,"tvr":0.11},"ETTV":{"s":2,"tvr":0.25},"TVBSG":{"s":2,"tvr":0.04},"CP":{"s":1,"tvr":0.06},"HLYWD":{"s":5,"tvr":0.33},"DAZN2":{"s":2,"tvr":0.07},"DAZN1":{"s":2,"tvr":0.02},"ANIMA":{"s":2,"tvr":0.07},"DISCV":{"s":2,"tvr":0.05},"TLC":{"s":2,"tvr":0.0},"TTV-G":{"s":1,"tvr":0.08},"CTV":{"s":1,"tvr":1.13},"MOMOV":{"s":1,"tvr":0.0}},"2026/05/14":{"CTV-C":{"s":4,"tvr":0.03},"CTV-N":{"s":6,"tvr":2.14},"FTVT":{"s":4,"tvr":0.0},"FTV1":{"s":3,"tvr":0.18},"CTV-B":{"s":1,"tvr":0.0},"GTV-D":{"s":3,"tvr":0.43},"ONTV":{"s":14,"tvr":1.14},"ET-D":{"s":4,"tvr":0.18},"GTV-1":{"s":3,"tvr":0.03},"VLD":{"s":10,"tvr":0.64},"VLJP":{"s":3,"tvr":0.08},"MUCH":{"s":6,"tvr":0.25},"TVBSG":{"s":2,"tvr":0.04},"ETTV":{"s":2,"tvr":0.25},"STV":{"s":1,"tvr":0.12},"HLYWD":{"s":5,"tvr":0.23},"CP":{"s":1,"tvr":0.08},"DAZN2":{"s":1,"tvr":0.02},"DISCV":{"s":2,"tvr":0.03},"TLC":{"s":2,"tvr":0.0},"ANIMA":{"s":2,"tvr":0.04},"DAZN1":{"s":1,"tvr":0.0},"TTV-F":{"s":1,"tvr":0.18}},"2026/05/15":{"CTV-C":{"s":4,"tvr":0.13},"FTV1":{"s":2,"tvr":0.15},"FTVT":{"s":2,"tvr":0.0},"CTV-N":{"s":6,"tvr":1.08},"CTV-B":{"s":1,"tvr":0.08},"GTV-1":{"s":3,"tvr":0.13},"ET-D":{"s":5,"tvr":0.65},"VLD":{"s":9,"tvr":0.42},"MUCH":{"s":7,"tvr":0.43},"ONTV":{"s":5,"tvr":0.36},"VLJP":{"s":2,"tvr":0.03},"GTV-D":{"s":3,"tvr":0.5},"ETTV":{"s":2,"tvr":0.28},"STV":{"s":1,"tvr":0.08},"TVBSG":{"s":1,"tvr":0.07},"HLYWD":{"s":5,"tvr":0.08},"CP":{"s":1,"tvr":0.04},"DAZN2":{"s":2,"tvr":0.15},"DAZN1":{"s":1,"tvr":0.05},"TLC":{"s":3,"tvr":0.0},"DISCV":{"s":2,"tvr":0.0},"ANIMA":{"s":2,"tvr":0.04},"TVBS":{"s":1,"tvr":0.14}},"2026/05/16":{"CTV-N":{"s":9,"tvr":0.95},"FTV1":{"s":1,"tvr":0.0},"FTVT":{"s":5,"tvr":0.05},"CTV-C":{"s":5,"tvr":0.02},"CTV-B":{"s":3,"tvr":0.05},"VLJP":{"s":2,"tvr":0.07},"VLD":{"s":6,"tvr":0.5},"MUCH":{"s":8,"tvr":0.09},"ET-D":{"s":4,"tvr":0.3},"GTV-1":{"s":3,"tvr":0.38},"ETTV":{"s":1,"tvr":0.09},"STV":{"s":1,"tvr":0.13},"ONTV":{"s":3,"tvr":0.51},"TVBSG":{"s":2,"tvr":0.07},"GTV-D":{"s":3,"tvr":0.19},"HLYWD":{"s":2,"tvr":0.19},"CP":{"s":1,"tvr":0.12},"DAZN2":{"s":2,"tvr":0.0},"ANIMA":{"s":7,"tvr":0.18},"TLC":{"s":6,"tvr":0.05},"DAZN1":{"s":2,"tvr":0.0},"DISCV":{"s":7,"tvr":0.29}},"2026/05/17":{"CTV-C":{"s":5,"tvr":0.08},"FTVT":{"s":7,"tvr":0.1},"CTV-B":{"s":4,"tvr":0.11},"FTV1":{"s":1,"tvr":0.1},"CTV-N":{"s":4,"tvr":0.29},"ONTV":{"s":5,"tvr":0.85},"ET-D":{"s":4,"tvr":0.41},"VLD":{"s":5,"tvr":0.31},"MUCH":{"s":8,"tvr":0.31},"ETTV":{"s":1,"tvr":0.08},"VLJP":{"s":2,"tvr":0.28},"STV":{"s":1,"tvr":0.11},"GTV-D":{"s":3,"tvr":0.32},"GTV-1":{"s":3,"tvr":0.28},"TVBSG":{"s":1,"tvr":0.0},"CP":{"s":2,"tvr":0.08},"HLYWD":{"s":2,"tvr":0.09},"ANIMA":{"s":7,"tvr":0.26},"TLC":{"s":6,"tvr":0.06},"DISCV":{"s":7,"tvr":0.15},"DAZN1":{"s":2,"tvr":0.1},"DAZN2":{"s":2,"tvr":0.04},"CTV":{"s":2,"tvr":1.28}},"2026/05/18":{"CTV-N":{"s":5,"tvr":0.85},"CTV-C":{"s":5,"tvr":0.08},"FTVT":{"s":2,"tvr":0.0},"FTV1":{"s":2,"tvr":0.17},"CTV-B":{"s":4,"tvr":0.0},"MUCH":{"s":7,"tvr":0.22},"TVBSG":{"s":2,"tvr":0.13},"ET-D":{"s":4,"tvr":0.29},"GTV-1":{"s":10,"tvr":0.56},"GTV-D":{"s":3,"tvr":0.34},"ONTV":{"s":7,"tvr":0.34},"VLD":{"s":6,"tvr":0.25},"ETTV":{"s":2,"tvr":0.27},"STV":{"s":1,"tvr":0.08},"VLJP":{"s":2,"tvr":0.2},"HLYWD":{"s":5,"tvr":0.26},"CP":{"s":1,"tvr":0.04},"DAZN2":{"s":4,"tvr":0.0},"DAZN1":{"s":4,"tvr":0.02},"ANIMA":{"s":7,"tvr":0.29},"TLC":{"s":7,"tvr":0.09},"DISCV":{"s":7,"tvr":0.09},"UBN":{"s":3,"tvr":2.49},"TVBS":{"s":1,"tvr":0.12},"CTS-N":{"s":5,"tvr":0.71},"TVBSN":{"s":2,"tvr":0.88}},"2026/05/19":{"CTV-C":{"s":4,"tvr":0.06},"FTV1":{"s":2,"tvr":0.06},"FTVT":{"s":4,"tvr":0.0},"CTV-B":{"s":2,"tvr":0.0},"CTV-N":{"s":5,"tvr":1.47},"MUCH":{"s":8,"tvr":0.58},"ONTV":{"s":5,"tvr":0.33},"VLD":{"s":6,"tvr":0.5},"ET-D":{"s":6,"tvr":0.36},"GTV-1":{"s":10,"tvr":0.43},"VLJP":{"s":2,"tvr":0.0},"GTV-D":{"s":3,"tvr":0.62},"ETTV":{"s":3,"tvr":0.31},"STV":{"s":1,"tvr":0.0},"TVBSG":{"s":3,"tvr":0.25},"CP":{"s":2,"tvr":0.0},"HLYWD":{"s":5,"tvr":0.18},"DAZN2":{"s":3,"tvr":0.07},"ANIMA":{"s":7,"tvr":0.1},"TLC":{"s":7,"tvr":0.08},"DISCV":{"s":8,"tvr":0.38},"DAZN1":{"s":2,"tvr":0.0},"UBN":{"s":3,"tvr":2.85},"CTS-N":{"s":6,"tvr":0.81},"TVBS":{"s":1,"tvr":0.43},"TVBSN":{"s":2,"tvr":0.88},"CTV":{"s":1,"tvr":0.06},"ERA-N":{"s":1,"tvr":0.07},"MOMOV":{"s":1,"tvr":0.0}},"2026/05/20":{"CTV-C":{"s":4,"tvr":0.06},"CTV-N":{"s":3,"tvr":1.64},"FTVT":{"s":4,"tvr":0.0},"FTV1":{"s":2,"tvr":0.13},"CTV-B":{"s":2,"tvr":0.1},"MUCH":{"s":12,"tvr":0.56},"VLJP":{"s":1,"tvr":0.0},"VLD":{"s":9,"tvr":0.46},"GTV-D":{"s":3,"tvr":0.52},"GTV-1":{"s":10,"tvr":0.55},"ET-D":{"s":5,"tvr":0.38},"ONTV":{"s":6,"tvr":0.54},"ETTV":{"s":3,"tvr":0.48},"STV":{"s":1,"tvr":0.0},"TVBSG":{"s":2,"tvr":0.19},"HLYWD":{"s":5,"tvr":0.06},"CP":{"s":1,"tvr":0.04},"DAZN2":{"s":5,"tvr":0.07},"DISCV":{"s":7,"tvr":0.09},"TLC":{"s":7,"tvr":0.0},"ANIMA":{"s":7,"tvr":0.05},"DAZN1":{"s":2,"tvr":0.02},"UBN":{"s":3,"tvr":2.03},"CTS-N":{"s":5,"tvr":0.65},"TVBSN":{"s":2,"tvr":0.6},"TVBS":{"s":1,"tvr":0.53},"CTV":{"s":1,"tvr":1.14}},"2026/05/21":{"CTV-C":{"s":4,"tvr":0.1},"FTVT":{"s":4,"tvr":0.02},"CTV-N":{"s":5,"tvr":1.51},"FTV1":{"s":2,"tvr":0.15},"CTV-B":{"s":1,"tvr":0.02},"VLD":{"s":6,"tvr":0.31},"GTV-D":{"s":3,"tvr":0.3},"MUCH":{"s":11,"tvr":0.68},"VLJP":{"s":3,"tvr":0.08},"ET-D":{"s":5,"tvr":0.27},"GTV-1":{"s":10,"tvr":0.47},"ONTV":{"s":4,"tvr":0.27},"ETTV":{"s":2,"tvr":0.25},"STV":{"s":1,"tvr":0.05},"TVBSG":{"s":2,"tvr":0.06},"HLYWD":{"s":5,"tvr":0.23},"CP":{"s":1,"tvr":0.0},"DAZN2":{"s":3,"tvr":0.04},"ANIMA":{"s":5,"tvr":0.06},"TLC":{"s":9,"tvr":0.0},"DISCV":{"s":7,"tvr":0.18},"DAZN1":{"s":2,"tvr":0.0},"UBN":{"s":3,"tvr":2.25},"CTS-N":{"s":5,"tvr":1.04},"TVBSN":{"s":2,"tvr":0.69},"TVBS":{"s":1,"tvr":0.36}},"2026/05/22":{"CTV-C":{"s":5,"tvr":0.1},"FTV1":{"s":2,"tvr":0.12},"CTV-N":{"s":2,"tvr":0.34},"FTVT":{"s":4,"tvr":0.03},"CTV-B":{"s":2,"tvr":0.02},"ET-D":{"s":5,"tvr":0.45},"VLD":{"s":9,"tvr":0.53},"GTV-1":{"s":10,"tvr":0.78},"MUCH":{"s":10,"tvr":0.69},"VLJP":{"s":3,"tvr":0.12},"ONTV":{"s":5,"tvr":0.34},"GTV-D":{"s":3,"tvr":0.46},"ETTV":{"s":3,"tvr":0.34},"STV":{"s":1,"tvr":0.13},"TVBSG":{"s":1,"tvr":0.0},"HLYWD":{"s":5,"tvr":0.32},"CP":{"s":1,"tvr":0.07},"DAZN2":{"s":3,"tvr":0.06},"TLC":{"s":5,"tvr":0.0},"ANIMA":{"s":6,"tvr":0.25},"DISCV":{"s":4,"tvr":0.11},"DAZN1":{"s":3,"tvr":0.04},"UBN":{"s":3,"tvr":2.25},"CTS-N":{"s":5,"tvr":0.62},"TVBSN":{"s":2,"tvr":1.04},"TVBS":{"s":1,"tvr":0.0},"MOMOV":{"s":1,"tvr":0.0}},"2026/05/23":{"CTV-C":{"s":7,"tvr":0.18},"FTVT":{"s":7,"tvr":0.06},"CTV-N":{"s":2,"tvr":0.82},"CTV-B":{"s":3,"tvr":0.09},"FTV1":{"s":2,"tvr":0.16},"ET-D":{"s":5,"tvr":0.24},"ONTV":{"s":3,"tvr":0.17},"MUCH":{"s":11,"tvr":0.39},"VLJP":{"s":2,"tvr":0.19},"GTV-D":{"s":11,"tvr":0.8},"ETTV":{"s":2,"tvr":0.14},"GTV-1":{"s":9,"tvr":0.77},"VLD":{"s":5,"tvr":0.3},"TVBSG":{"s":2,"tvr":0.23},"STV":{"s":1,"tvr":0.07},"CP":{"s":1,"tvr":0.0},"HLYWD":{"s":2,"tvr":0.13},"DAZN2":{"s":4,"tvr":0.07},"ANIMA":{"s":5,"tvr":0.1},"DAZN1":{"s":4,"tvr":0.12},"DISCV":{"s":4,"tvr":0.3},"TLC":{"s":3,"tvr":0.02},"UBN":{"s":5,"tvr":0.99},"CTS-N":{"s":5,"tvr":1.0},"TVBSN":{"s":2,"tvr":0.98},"TVBS":{"s":1,"tvr":0.32}},"2026/05/24":{"CTV-C":{"s":4,"tvr":0.1},"FTV1":{"s":1,"tvr":0.0},"FTVT":{"s":6,"tvr":0.03},"CTV-N":{"s":5,"tvr":0.77},"CTV-B":{"s":4,"tvr":0.14},"ET-D":{"s":5,"tvr":0.57},"MUCH":{"s":10,"tvr":0.15},"ONTV":{"s":5,"tvr":0.68},"GTV-1":{"s":10,"tvr":1.01},"GTV-D":{"s":11,"tvr":1.14},"VLJP":{"s":2,"tvr":0.19},"ETTV":{"s":2,"tvr":0.0},"VLD":{"s":4,"tvr":0.28},"TVBSG":{"s":1,"tvr":0.0},"STV":{"s":1,"tvr":0.32},"CP":{"s":1,"tvr":0.0},"HLYWD":{"s":2,"tvr":0.14},"DAZN2":{"s":2,"tvr":0.02},"DISCV":{"s":4,"tvr":0.11},"TLC":{"s":5,"tvr":0.04},"DAZN1":{"s":2,"tvr":0.14},"ANIMA":{"s":5,"tvr":0.0},"UBN":{"s":5,"tvr":1.24},"CTS-N":{"s":6,"tvr":1.88},"TVBSN":{"s":2,"tvr":1.79},"TVBS":{"s":1,"tvr":0.41},"FTV":{"s":1,"tvr":0.07}},"2026/05/25":{"CTV-C":{"s":4,"tvr":0.09},"FTV1":{"s":3,"tvr":0.21},"CTV-B":{"s":2,"tvr":0.0},"FTVT":{"s":3,"tvr":0.0},"CTV-N":{"s":3,"tvr":1.27},"VLD":{"s":10,"tvr":0.26},"MUCH":{"s":12,"tvr":0.87},"ONTV":{"s":5,"tvr":0.55},"GTV-D":{"s":4,"tvr":1.05},"ET-D":{"s":6,"tvr":0.49},"VLJP":{"s":2,"tvr":0.04},"GTV-1":{"s":10,"tvr":0.31},"ETTV":{"s":3,"tvr":0.33},"STV":{"s":1,"tvr":0.02},"TVBSG":{"s":1,"tvr":0.02},"HLYWD":{"s":5,"tvr":0.29},"CP":{"s":1,"tvr":0.07},"DAZN2":{"s":3,"tvr":0.02},"DAZN1":{"s":3,"tvr":0.02},"DISCV":{"s":5,"tvr":0.14},"TLC":{"s":5,"tvr":0.11},"ANIMA":{"s":5,"tvr":0.16},"UBN":{"s":3,"tvr":2.89},"CTS-N":{"s":6,"tvr":0.78},"TVBS":{"s":1,"tvr":0.03},"TVBSN":{"s":2,"tvr":1.1},"ERA-N":{"s":1,"tvr":0.12}},"2026/05/26":{"CTV-C":{"s":4,"tvr":0.21},"FTV1":{"s":4,"tvr":0.2},"FTVT":{"s":4,"tvr":0.07},"CTV-N":{"s":5,"tvr":1.45},"CTV-B":{"s":1,"tvr":0.0},"GTV-1":{"s":11,"tvr":0.29},"MUCH":{"s":9,"tvr":0.75},"VLD":{"s":6,"tvr":0.44},"VLJP":{"s":2,"tvr":0.02},"GTV-D":{"s":4,"tvr":0.43},"ET-D":{"s":4,"tvr":0.27},"ONTV":{"s":5,"tvr":0.39},"STV":{"s":1,"tvr":0.0},"ETTV":{"s":2,"tvr":0.13},"TVBSG":{"s":2,"tvr":0.15},"HLYWD":{"s":5,"tvr":0.15},"CP":{"s":1,"tvr":0.02},"DAZN2":{"s":3,"tvr":0.02},"ANIMA":{"s":1,"tvr":0.0},"TLC":{"s":1,"tvr":0.0},"DISCV":{"s":1,"tvr":0.0},"UBN":{"s":3,"tvr":2.34},"CTS-N":{"s":5,"tvr":0.45},"TVBS":{"s":1,"tvr":0.04},"TVBSN":{"s":2,"tvr":1.08},"TTV-G":{"s":1,"tvr":0.09}},"2026/05/27":{"FTV1":{"s":3,"tvr":0.19},"FTVT":{"s":5,"tvr":0.0},"CTV-N":{"s":4,"tvr":0.69},"CTV-C":{"s":2,"tvr":0.14},"CTV-B":{"s":1,"tvr":0.0},"MUCH":{"s":12,"tvr":0.75},"VLJP":{"s":4,"tvr":0.08},"ET-D":{"s":7,"tvr":0.77},"VLD":{"s":6,"tvr":0.3},"ONTV":{"s":5,"tvr":0.24},"GTV-1":{"s":10,"tvr":0.41},"GTV-D":{"s":4,"tvr":0.82},"STV":{"s":1,"tvr":0.02},"ETTV":{"s":4,"tvr":0.35},"TVBSG":{"s":3,"tvr":0.35},"CP":{"s":1,"tvr":0.0},"HLYWD":{"s":5,"tvr":0.1},"DAZN2":{"s":3,"tvr":0.0},"DISCV":{"s":1,"tvr":0.0},"DAZN1":{"s":1,"tvr":0.0},"ANIMA":{"s":1,"tvr":0.05},"TLC":{"s":1,"tvr":0.0},"UBN":{"s":3,"tvr":2.43},"CTS-N":{"s":5,"tvr":0.82},"TVBSN":{"s":2,"tvr":1.21},"TVBS":{"s":1,"tvr":0.17}},"2026/05/28":{"CTV-N":{"s":3,"tvr":1.3},"FTV1":{"s":2,"tvr":0.07},"FTVT":{"s":3,"tvr":0.0},"CTV-B":{"s":3,"tvr":0.11},"CTV-C":{"s":1,"tvr":0.04},"MUCH":{"s":11,"tvr":0.85},"VLD":{"s":5,"tvr":0.25},"GTV-1":{"s":10,"tvr":0.41},"ONTV":{"s":5,"tvr":0.25},"ET-D":{"s":6,"tvr":0.42},"VLJP":{"s":4,"tvr":0.08},"GTV-D":{"s":4,"tvr":0.65},"STV":{"s":1,"tvr":0.07},"ETTV":{"s":4,"tvr":0.4},"TVBSG":{"s":3,"tvr":0.07},"CP":{"s":1,"tvr":0.0},"HLYWD":{"s":5,"tvr":0.14},"DAZN2":{"s":2,"tvr":0.0},"DAZN1":{"s":1,"tvr":0.0},"DISCV":{"s":1,"tvr":0.0},"ANIMA":{"s":1,"tvr":0.18},"TLC":{"s":1,"tvr":0.0},"UBN":{"s":3,"tvr":2.95},"CTS-N":{"s":5,"tvr":0.75},"TVBSN":{"s":2,"tvr":0.98},"TVBS":{"s":1,"tvr":0.11}},"2026/05/29":{"FTV1":{"s":3,"tvr":0.22},"CTV-C":{"s":2,"tvr":0.2},"FTVT":{"s":4,"tvr":0.02},"CTV-N":{"s":3,"tvr":0.39},"CTV-B":{"s":1,"tvr":0.11},"VLD":{"s":6,"tvr":0.31},"MUCH":{"s":11,"tvr":0.84},"ET-D":{"s":7,"tvr":0.52},"VLJP":{"s":4,"tvr":0.07},"GTV-1":{"s":10,"tvr":0.32},"ONTV":{"s":5,"tvr":0.5},"GTV-D":{"s":4,"tvr":0.4},"ETTV":{"s":4,"tvr":0.26},"STV":{"s":1,"tvr":0.0},"TVBSG":{"s":1,"tvr":0.04},"HLYWD":{"s":5,"tvr":0.13},"CP":{"s":1,"tvr":0.09},"DAZN2":{"s":3,"tvr":0.02},"DISCV":{"s":1,"tvr":0.0},"ANIMA":{"s":1,"tvr":0.0},"TLC":{"s":1,"tvr":0.02},"DAZN1":{"s":1,"tvr":0.0},"TVBSN":{"s":2,"tvr":1.39},"CTS-N":{"s":5,"tvr":0.95},"UBN":{"s":3,"tvr":1.71},"TVBS":{"s":2,"tvr":0.38}},"2026/05/30":{"FTVT":{"s":4,"tvr":0.13},"FTV1":{"s":3,"tvr":0.1},"CTV-N":{"s":6,"tvr":1.6},"CTV-B":{"s":2,"tvr":0.02},"CTV-C":{"s":1,"tvr":0.0},"VLD":{"s":4,"tvr":0.24},"GTV-D":{"s":4,"tvr":0.17},"ONTV":{"s":3,"tvr":0.53},"ET-D":{"s":6,"tvr":0.37},"VLJP":{"s":4,"tvr":0.71},"MUCH":{"s":12,"tvr":0.36},"GTV-1":{"s":8,"tvr":1.29},"ETTV":{"s":3,"tvr":0.08},"TVBSG":{"s":1,"tvr":0.04},"STV":{"s":1,"tvr":0.07},"HLYWD":{"s":3,"tvr":0.2},"CP":{"s":1,"tvr":0.05},"DAZN2":{"s":3,"tvr":0.05},"DISCV":{"s":1,"tvr":0.05},"DAZN1":{"s":1,"tvr":0.07},"ANIMA":{"s":1,"tvr":0.05},"TLC":{"s":1,"tvr":0.0},"UBN":{"s":3,"tvr":0.48},"CTS-N":{"s":5,"tvr":1.05},"TVBS":{"s":1,"tvr":0.21},"TVBSN":{"s":2,"tvr":1.56}},"2026/05/31":{"CTV-N":{"s":7,"tvr":1.3},"FTV1":{"s":2,"tvr":0.17},"FTVT":{"s":3,"tvr":0.09},"CTV-C":{"s":2,"tvr":0.17},"CTV-B":{"s":2,"tvr":0.07},"ET-D":{"s":6,"tvr":0.59},"GTV-D":{"s":4,"tvr":0.14},"ETTV":{"s":3,"tvr":0.23},"MUCH":{"s":12,"tvr":0.35},"VLD":{"s":4,"tvr":0.19},"GTV-1":{"s":10,"tvr":1.07},"VLJP":{"s":4,"tvr":0.74},"ONTV":{"s":4,"tvr":0.56},"TVBSG":{"s":1,"tvr":0.05},"STV":{"s":1,"tvr":0.17},"CP":{"s":1,"tvr":0.02},"HLYWD":{"s":3,"tvr":0.23},"DAZN2":{"s":2,"tvr":0.04},"DAZN1":{"s":1,"tvr":0.0},"DISCV":{"s":1,"tvr":0.0},"TLC":{"s":1,"tvr":0.0},"ANIMA":{"s":1,"tvr":0.13},"CTS-N":{"s":5,"tvr":1.66},"TVBSN":{"s":2,"tvr":1.41},"UBN":{"s":3,"tvr":0.34},"TVBS":{"s":1,"tvr":0.37},"CTV":{"s":1,"tvr":0.94}},"2026/05/02":{"CTV-N":{"s":2,"tvr":0.08}},"2026/05/03":{"CTV-N":{"s":2,"tvr":0.13},"TVBS":{"s":1,"tvr":0.28},"FTV1":{"s":1,"tvr":0.0}}},"timeCC":{"MUCH":{"06-09":{"s":15,"tvr":0.31},"09-12":{"s":28,"tvr":1.24},"12-15":{"s":33,"tvr":1.36},"15-18":{"s":33,"tvr":2.07}},"ONTV":{"06-09":{"s":15,"tvr":0.8},"09-12":{"s":19,"tvr":0.98},"12-15":{"s":19,"tvr":1.15},"15-18":{"s":20,"tvr":2.48}},"VLJP":{"06-09":{"s":16,"tvr":0.4},"09-12":{"s":20,"tvr":1.08},"12-15":{"s":15,"tvr":0.21},"15-18":{"s":1,"tvr":0.0}},"VLD":{"06-09":{"s":16,"tvr":0.55},"09-12":{"s":13,"tvr":0.6},"15-18":{"s":21,"tvr":1.47},"12-15":{"s":17,"tvr":1.33}},"TTV":{"06-09":{"s":12,"tvr":2.39},"09-12":{"s":10,"tvr":0.42},"12-15":{"s":14,"tvr":3.07},"15-18":{"s":26,"tvr":1.91}},"FTV":{"09-12":{"s":12,"tvr":0.81},"15-18":{"s":12,"tvr":3.21},"12-15":{"s":19,"tvr":13.04},"18-21":{"s":1,"tvr":0.39}},"CTV":{"12-15":{"s":13,"tvr":5.33},"15-18":{"s":14,"tvr":1.94},"18-21":{"s":11,"tvr":14.3},"09-12":{"s":2,"tvr":0.17}},"MOMOV":{"06-09":{"s":113,"tvr":0.17},"09-12":{"s":38,"tvr":0.33},"12-15":{"s":45,"tvr":0.57},"15-18":{"s":46,"tvr":0.56},"18-21":{"s":23,"tvr":1.04}},"CTV-C":{"06-09":{"s":17,"tvr":0.2},"12-15":{"s":25,"tvr":0.59},"18-21":{"s":18,"tvr":0.69},"09-12":{"s":7,"tvr":0.05},"15-18":{"s":3,"tvr":0.02}},"FTV1":{"09-12":{"s":15,"tvr":0.39},"15-18":{"s":23,"tvr":1.38},"12-15":{"s":14,"tvr":0.59},"18-21":{"s":2,"tvr":0.03}},"FTVT":{"09-12":{"s":44,"tvr":0.32},"15-18":{"s":24,"tvr":0.23},"12-15":{"s":21,"tvr":0.3}},"TLC":{"09-12":{"s":18,"tvr":0.1},"12-15":{"s":16,"tvr":0.2},"15-18":{"s":20,"tvr":0.16},"18-21":{"s":8,"tvr":0.07}},"ANIMA":{"12-15":{"s":21,"tvr":0.73},"15-18":{"s":18,"tvr":0.71},"18-21":{"s":8,"tvr":0.44},"09-12":{"s":15,"tvr":0.31}},"DISCV":{"12-15":{"s":17,"tvr":0.33},"15-18":{"s":25,"tvr":0.74},"18-21":{"s":10,"tvr":0.3},"09-12":{"s":12,"tvr":0.07}},"CTV-B":{"18-21":{"s":30,"tvr":0.57},"12-15":{"s":8,"tvr":0.19},"15-18":{"s":2,"tvr":0.0}},"ERA-N":{"06-09":{"s":25,"tvr":2.77},"09-12":{"s":21,"tvr":3.33},"12-15":{"s":11,"tvr":1.92},"15-18":{"s":17,"tvr":5.01}},"UBN":{"06-09":{"s":17,"tvr":14.68},"09-12":{"s":9,"tvr":8.43},"15-18":{"s":29,"tvr":5.78},"12-15":{"s":9,"tvr":5.07}},"CTS-N":{"09-12":{"s":30,"tvr":3.93},"12-15":{"s":22,"tvr":4.6},"15-18":{"s":16,"tvr":3.28},"06-09":{"s":2,"tvr":0.38}},"CTV-N":{"09-12":{"s":25,"tvr":3.18},"15-18":{"s":24,"tvr":3.77},"18-21":{"s":39,"tvr":12.59},"12-15":{"s":20,"tvr":4.31},"06-09":{"s":16,"tvr":2.16}},"EFNC":{"06-09":{"s":16,"tvr":2.38},"09-12":{"s":10,"tvr":6.03},"12-15":{"s":2,"tvr":0.27},"15-18":{"s":15,"tvr":2.05}},"TTV-F":{"06-09":{"s":23,"tvr":3.18},"09-12":{"s":50,"tvr":11.47},"12-15":{"s":71,"tvr":10.39},"15-18":{"s":81,"tvr":1.92}},"SET-F":{"09-12":{"s":26,"tvr":1.32},"12-15":{"s":24,"tvr":1.92},"15-18":{"s":28,"tvr":2.34}},"TTV-G":{"15-18":{"s":3,"tvr":0.08},"18-21":{"s":1,"tvr":0.03}},"TVBS":{"15-18":{"s":2,"tvr":0.39}},"TTV-N":{"09-12":{"s":2,"tvr":0.23}}},"timeCalls":{"cc":{"CTS":{"06-09":2},"CTV-N":{"18-21":44,"12-15":17,"09-12":11,"06-09":26,"15-18":7},"CTS-N":{"15-18":12,"09-12":4,"12-15":3},"TTV-G":{"15-18":10,"18-21":2},"CTV":{"18-21":30,"09-12":15,"12-15":3,"06-09":5},"TVBS":{"15-18":23,"09-12":3,"12-15":1},"ERA-N":{"15-18":28},"MOMOV":{"06-09":6},"FTV":{"12-15":16,"15-18":11,"18-21":10},"SANLI":{"06-09":3},"TTV":{"06-09":6},"UBN":{"09-12":16,"06-09":9,"12-15":1,"18-21":1,"15-18":7},"FTV1":{"09-12":10,"15-18":10,"18-21":3,"12-15":3},"FTVT":{"12-15":8,"09-12":9,"15-18":4},"DISCV":{"15-18":4,"12-15":2,"18-21":1},"ANIMA":{"15-18":5,"18-21":2},"CTV-C":{"12-15":4,"06-09":5,"18-21":3,"15-18":1},"CTV-B":{"18-21":3,"15-18":1,"12-15":1},"DAZN2":{"06-09":3,"15-18":2},"DAZN1":{"06-09":1,"12-15":1,"15-18":1,"09-12":1},"TLC":{"15-18":3},"VLJP":{"06-09":4,"15-18":2,"12-15":2},"ONTV":{"06-09":2,"12-15":5,"09-12":6,"15-18":7},"MUCH":{"09-12":5,"15-18":12,"12-15":9},"GTV-D":{"15-18":10,"06-09":2,"12-15":1,"09-12":3},"TVBSG":{"09-12":2},"STV":{"09-12":8},"ET-D":{"06-09":2,"09-12":6,"12-15":2,"15-18":1},"VLD":{"09-12":9,"12-15":3,"15-18":8,"06-09":1},"ETTV":{"12-15":2,"09-12":2},"GTV-1":{"06-09":1,"12-15":3,"09-12":6,"15-18":4},"TVBSN":{"09-12":4,"15-18":2,"12-15":3},"CP":{"09-12":2},"HLYWD":{"12-15":1,"18-21":2,"15-18":5,"09-12":1}},"mat":{"070585天之音15天A300":{"06-09":5,"18-21":29,"15-18":19,"12-15":13},"358853全武杭300":{"09-12":35,"06-09":26,"15-18":54,"12-15":18,"18-21":41},"888837完睡探案300":{"18-21":8},"357753今晚能睡300":{"06-09":13,"15-18":10,"09-12":2,"18-21":5,"12-15":2},"455555生芝麻60":{"15-18":16,"18-21":13,"09-12":16,"12-15":19,"06-09":9},"030036生芝麻B60":{"06-09":4,"12-15":3,"15-18":10,"18-21":2,"09-12":1},"777001百醫活動60":{"15-18":45,"06-09":12,"09-12":47,"12-15":27},"030335百醫活動B60":{"06-09":9,"09-12":19,"12-15":8,"15-18":19,"18-21":1},"070583天公保庇60":{"09-12":3,"12-15":1,"18-21":2,"15-18":5},"888237一訂睡好60":{"15-18":2}}},"progTop":{"DISCV":[["西班牙邊境護衛隊第9季:第",7,0.11],["金礦的賭注第16季:篩礦機",4,0.32],["舊貨獵人:最讚買賣第3季",4,0.08],["家在阿拉斯加第9季:耶誕危",4,0.2],["舊貨獵人第20季:保留英國",4,0.09],["漁人的搏鬥第18季:雄鷹來",3,0.06],["倉儲挖寶王第4季:反目成仇",3,0.0],["舊貨獵人修復篇第4季:百年",3,0.07],["舊貨獵人修復篇第4季:鐵道",3,0.11],["漁人的搏鬥第18季:無法回",3,0.18],["阿拉斯加造屋家第11季:臨",1,0.16],["金礦的賭注急流篇第7季:白",2,0.15],["征服絕境第2季:艾弗格雷茲",3,0.12],["樹屋大師第3季:超酷美景屋",1,0.1],["家在阿拉斯加第9季:受困潮",2,0.1]],"ANIMA":[["生命旅程:生存功課",5,0.28],["陷阱與埋伏:陷阱",4,0.22],["生命旅程:生命之初",3,0.14],["布朗克斯動物園第4季:神奇",3,0.0],["生命泉源湄公河:寮國",3,0.09],["野性之海:顏色與偽裝",3,0.1],["萬塔拉:保育園區紀實:專家",3,0.13],["生命旅程:生命傳承",3,0.19],["動物求生之道:高山",3,0.05],["萬塔拉:保育園區紀實:醫療",3,0.02],["鱷魚拍檔這一家:保育野生",1,0.18],["奇妙的野生世界",1,0.13],["狗兒救援迎新生第8季:勇敢",2,0.12],["老虎血脈:未來的虎王",1,0.1]],"TLC":[["房產兄弟:A咖報恩計畫第6",5,0.02],["跟著艾琳去流浪:肯塔基駿",5,0.1],["我的夢幻婚紗蘭開夏篇:媽",4,0.0],["樂透夢想屋第15季:百萬起",3,0.0],["離開美國結婚去第7季:不要",3,0.04],["免拆屋大改造第2季:捲土重",3,0.0],["落髮診療室:第1集",2,0.0],["巴比家吃遍加州海岸:洛杉",2,0.0],["我的夢幻婚紗第16季:百感",2,0.0],["修復英式莊園:最後的鑰匙",2,0.0],["低預算造街區:老虎窗與棕",2,0.05],["戰痘醫師第4季:鼻子的腫塊",1,0.05],["戰痘醫師第4季:爬蟲高手的",1,0.05],["風城改造專家第3季:十年後",1,0.04],["樂透夢想屋第15季:手足情",2,0.04],["風城改造專家第3季:時間緊",1,0.04],["低預算造街區:白盒屋與舒",1,0.03],["普雷斯這一家第3季:秘密驚",1,0.02]],"CTV-N":[["中視新聞全球報導6點搶先",31,6.46],["0800整點新聞",15,1.9],["1300即時新聞現場",12,2.0],["新庶民大頭家",11,1.92],["1500即時新聞現場",8,1.01],["即時新聞現場0900",7,1.19],["中視新聞全球報導",7,6.27],["1100新庶民大頭家1100",6,0.87],["中視午間新聞",6,2.78],["1400即時新聞現場",5,0.33]],"FTVT":[["民視午間新聞",24,0.45],["GOGO TAIWAN民視四季線上",14,0.07],["要健康就運動",8,0.02],["台灣心在地情",4,0.0],["想像台灣民視四季線上",3,0.04],["1600我們一家人WE ARE TEA",3,0.06],["1500島嶼之眼咱ㄟ故事",3,0.02],["1630講台語當著時",3,0.0],["決策者",3,0.03],["1000想像台灣民視四季線上",3,0.0],["我們一家人多元新力量",3,0.1],["1400民視異言堂",3,0.08],["1600想像台灣民視四季線上",3,0.06],["1000青春異言堂",3,0.03],["1500想像台灣民視四季線上",2,0.02]],"FTV1":[["夜市人生民視四季線上",14,0.97],["嫁妝民視四季線上",13,0.53],["民視午間新聞",11,0.34],["春花望露找到了旅行社",4,0.64],["GO GO TAIWAN民視四季線上",3,0.12],["綜藝新時代發現台灣台塑石",3,0.24],["元氣加油站消費高手一起購",2,0.04],["最強綜藝秀",2,0.1],["1400綜藝大集合台塑石油AP",2,0.07],["民視晚間新聞",2,0.35]],"CTV-B":[["1800女人花",19,0.11],["中視新聞全球報導",16,0.9],["中視午間新聞",12,0.08],["1500繞著幸福轉",10,0.05],["1300康熙來了",3,0.07],["英才文教基金會大陸尋奇",3,0.14],["MIT台灣誌",2,0.0],["1300美麗藝能界",1,0.0]],"CTV-C":[["中視新聞全球報導",20,0.98],["心事誰人知",10,0.58],["沈春華LIFE SHOW",9,0.09],["0900大陸尋奇",9,0.17],["1600繞著幸福轉",8,0.05],["良人",8,0.58],["世間父母",7,0.0],["1300台灣保庇",6,0.15],["1700你猜你猜你猜猜猜",6,0.04],["SS小燕之夜",5,0.08],["1200大陸尋奇",3,0.06],["0800你猜你猜你猜猜猜",3,0.04]],"nan":[["nan",10,209.36]],"TVBSG":[["加油喜事相信愛情",9,0.23],["1700女人我最大享食尚",5,0.29],["1000食尚玩家",5,0.42],["0900愛你",4,0.36],["1000食尚玩家我們這一家",4,0.11],["1100女人我最大享食尚",4,0.15],["150011點熱吵店",2,0.12],["100011點熱吵店",2,0.18],["1400你給我的喜歡",2,0.38],["健康2 0享食尚滴雞精",2,0.09],["問心",1,0.19],["1200食尚玩家瘋狂總部",1,0.18]],"ET-D":[["1000熨斗家族",20,1.96],["1600熨斗家族",20,2.47],["0800似錦",17,1.04],["0900熨斗家族",17,0.4],["1000一日三餐5",9,0.64],["進擊的台灣",9,0.98],["一日三餐5",6,0.69],["灼灼風流",6,0.57],["0800灼灼風流",4,0.12],["0900灼灼風流",4,0.29],["1600灼灼風流",3,0.41],["1100女神降臨",4,0.31]],"VLD":[["明日也晴朗",15,1.26],["黃色復仇草",14,0.34],["1000蜀錦人家",13,1.01],["0900蜀錦人家",13,0.42],["0800個人取向",12,0.27],["樂遊原",12,0.81],["1400蜀錦人家",11,0.44],["1600黃色復仇草",11,0.27],["賢內助女王",11,0.35],["台灣傳奇",10,1.9],["1300個人取向",7,1.42],["0900綜藝大集合",8,0.73],["1200個人取向",9,0.6],["1300月亮在江邊流淌",6,0.47]],"VLJP":[["0800夫婦日和",9,0.22],["1200怪談夫妻",8,0.09],["1300推理要在晚餐後",7,0.2],["0800怪談夫妻",6,0.15],["1300上鎖的房間",5,0.15],["0900推理要在晚餐後",4,0.04],["1100妙國民糾察隊",4,0.3],["1500日本我來了",4,0.09],["日本職人好吃驚",4,0.47],["0900上鎖的房間",4,0.03],["住宅改造王",2,0.42],["日本秘境住人好吃驚",1,0.4],["司機才知道日本最強隱藏美",2,0.3],["1600來去鄉下食堂住一晚",1,0.27],["日本秘境有房好吃驚",2,0.25],["0945司機才知道日本最強隱",1,0.22]],"ETTV":[["1300小姐不熙娣",21,1.23],["0900全民星攻略",20,3.14],["0900小姐不熙娣",12,0.62],["花甲少年趣旅行吃喝玩樂全",5,0.67],["打卡吧我的炫FOOD日記",2,0.13],["1400醫師好辣福爾六合一血",1,0.08],["1400醫師好辣",1,0.03],["平約瑟牧師系列",1,0.0],["樂活好正點",1,0.07]],"GTV-1":[["1200八大民生新聞",15,0.49],["0900李示示",13,0.32],["0800李示示",13,0.28],["1500卿卿日常",12,0.54],["綜藝新時代",10,1.01],["1400卿卿日常",7,0.04],["0900奇皇后",7,0.1],["1000卿卿日常",6,0.33],["0800奇皇后",6,0.02],["1100卿卿日常",5,0.89],["台灣第一等特輯",4,0.56],["1100詹姆士出走料理好菇道",3,0.52],["故鄉好滋味",4,0.52],["1300台灣第一等萬士益冷氣",3,0.48],["1500我的成長DR CYJ全方位",4,0.42],["1600故鄉好滋味",3,0.41]],"STV":[["銅板美食呷透透",16,1.34],["1000神之路",4,0.59],["0900效年出發吧台塑石油AP",4,0.73],["0900明星算算鍋",4,0.09]],"MUCH":[["1000愛妮雅化妝品絲健康好",19,1.34],["1400愛妮雅化妝品絲健康好",17,1.14],["1500憨夫成龍",16,0.57],["1300正義女神",15,0.6],["假日電影院",12,0.22],["0830好樂活視倍佳木台灣壹",12,0.46],["1200好樂活益生菌EX星奇網",12,0.47],["0800好樂活視倍佳木台灣壹",11,0.32],["1700長鈺溫泉飯店美味So M",9,1.07],["1730長鈺溫泉飯店美味So M",9,1.48],["1130長鈺溫泉飯店美味So M",8,1.12],["1100長鈺溫泉飯店美味So M",4,0.54]],"ONTV":[["1200草山春暉",18,3.53],["1000寶島西米樂",17,0.41],["1700一字千金",16,1.74],["1600女王大人",12,0.49],["新戲說台灣",10,1.16],["1100草山春暉",7,1.12],["0800大胃王來了東西軍",6,0.19],["0900歡樂智多星",6,0.2],["0800大胃王來了吃遍台灣",5,0.12],["1400老闆真有趣人氣爆棚店",4,0.13],["1700大胃女王吃遍日本",3,0.63],["1400一字千金",2,0.55],["1300爆食姐妹吃透透",4,0.37],["老外瘋日本",3,0.3]],"GTV-D":[["0800國色芳華",16,1.04],["1600笑吧東海",10,2.11],["1100拜託老鷹5兄弟",9,1.32],["1200拜託老鷹5兄弟",7,1.83],["0900笑吧東海",5,0.34],["1400假釋審查官李韓信",5,0.43],["0800如懿傳樂敦製藥",4,0.21],["0900大唐攻略",4,0.14],["1100假釋審查官李韓信",4,0.37],["1500假釋審查官李韓信",4,0.56],["笑吧東海",2,0.8],["1500別對我動心樂敦製藥",3,0.52],["1300花轎喜事",2,0.35]],"CP":[["AI拼才會贏",3,0.06],["魔法阿媽",2,0.2],["使徒行者",2,0.14],["我家的事",2,0.07],["大嫂",2,0.2],["狄仁傑之神都龍王",2,0.04],["萬萬沒想到",2,0.19],["夜宴",2,0.08],["王者天下",2,0.0],["天師鬥殭屍",1,0.02],["西遊記之月光寶盒",1,0.09],["地下鐵",1,0.08],["熱血合唱團",1,0.07]],"HLYWD":[["極限逃殺",3,0.02],["驚爆封鎖線",3,0.18],["亡命對決",2,0.07],["戰略陰謀最後戰役",2,0.09],["赤眼玄機",2,0.07],["魔鬼司令",2,0.15],["阿拉丁",2,0.09],["限制級褓母",2,0.0],["哈特戰爭",2,0.04],["屍壩鯊",2,0.1],["不可能的任務致命清算",2,0.28],["玩命快遞2",2,0.18],["絕地戰將",1,0.18],["偷天派克",1,0.17],["神隱任務永不回頭",1,0.14],["黑蘭煞",1,0.14],["神鬼至尊",1,0.13],["捍衛戰士獨行俠",1,0.13]],"DAZN2":[["26中華職棒富邦對樂天",3,0.05],["企排高雄台電對鯨華",2,0.15],["FIBA3對3亞洲盃冠軍",2,0.08],["26中華職棒統一對樂天",2,0.03],["FIBA3對3成都冠軍賽",2,0.02],["FIBA3對3成都四強賽",2,0.0],["日本職棒巨人對橫濱",2,0.0],["麻將大師第七季EP50",2,0.07],["麻將大師第七季EP51",2,0.02],["西甲籃球畢爾包對皇馬",2,0.0],["日本職棒西武對軟銀",1,0.12],["麻將大師第七季EP44",1,0.07],["麻將大師第七季EP46",1,0.07],["麻將大師第七季EP61",2,0.05],["麻將大師第七季EP52",2,0.04],["麻將大師第七季EP53",2,0.04]],"DAZN1":[["日本職棒巨人對養樂多",3,0.0],["日本職棒西武對軟銀",3,0.02],["26中華職棒中信對統一",3,0.09],["日本職棒巨人對橫濱",3,0.0],["日本職棒軟銀對火腿",3,0.04],["日本職棒西武對樂天",2,0.0],["日本職棒羅德對火腿",2,0.07],["西甲萊萬特對馬約卡",2,0.0],["西甲奧薩蘇納對馬競",2,0.0],["日本職棒歐力士對軟銀",2,0.04],["德州撲克大賽第十季EP1",1,0.1],["麻將大師第七季EP62",1,0.07],["西甲阿拉維斯對巴薩",1,0.07],["麻將大師第七季EP17",1,0.07],["西甲皇馬對畢爾包",1,0.04],["西甲巴薩對皇馬",1,0.03]],"UBN":[["非凡MORNING CALL",10,7.54],["非凡最前線",4,5.94],["最前線直擊",4,4.67],["5整點新聞",3,0.71],["4整點新聞",2,0.37],["正午最前線",2,2.48],["7晚間新聞",2,1.13],["0700非凡大探索",2,0.24],["1700台灣人事物",2,0.31],["錢線快報1800",1,0.17],["最前線報告",1,1.32],["1700美食按個讚",1,0.44],["1100台灣真善美",1,0.41]],"TVBS":[["新聞大白話",4,1.18],["FOCUS世界新聞",2,0.66],["FOCUS國際話題",2,0.11],["新聞大白話特報",2,0.6],["1200TVBS文茜的世界周報歐",2,0.78],["1000金臨天下",2,0.07],["0900地球黃金線",1,0.12],["TVBS財經",1,0.17],["1200Focus全球新聞",1,0.21]],"CTS-N":[["華視0900整點新聞",14,2.12],["華視1100新聞搶先報",12,2.01],["華視在地新聞",10,1.99],["華視1400整點新聞",10,1.91],["華視1300午間新聞",9,1.74],["華視午間新聞",6,1.3],["華視1500整點新聞",6,0.78],["華視1600整點新聞",4,1.0],["0800GOOD MORNING台灣",1,0.02],["三國演議",1,0.07],["華視1000新聞搶先報",1,0.28]],"TVBSN":[["上午9點新聞",5,2.36],["1400說新聞",4,1.59],["1500整點新聞",4,1.41],["1700整點新聞",4,2.58],["上午11點新聞",4,2.88],["1600整點新聞",3,1.79],["1213整點新聞",2,1.67],["上午10點新聞",1,0.71],["早安台灣",1,0.6]],"ERA-N":[["1600雅琴看世界",2,0.23],["真相對話錄",1,0.07]],"SANLI":[["0700戲說台灣",1,0.09]],"TTV":[["早安台灣台語新聞",2,0.16]],"CTV":[["全民星攻略京都念慈菴",3,3.1],["1000藏海傳阿鈣八合一強效",2,0.15],["大陸尋奇三支雨傘標英才文",2,1.75],["1300阿鈣八合一強效綜藝一",1,0.47],["0800MIT台灣誌",1,0.06]],"FTV":[["1300超級冰冰SHOW安美諾美",2,0.49],["豆腐媽媽精華版安美諾美白",1,0.3],["飛龍在天起動生物科技龜鹿",1,0.31]],"MOMOV":[["0830MOMO瘋運動",4,0.0]],"TTV-G":[["楊麗花歌仔戲狂花飄雲夢真",3,0.2],["楊麗花歌仔戲伴鬼闖江湖真",1,0.04],["神機妙算劉伯溫真享購",1,0.04]],"CTS":[["三國演議",1,0.06]],"UF":[["台股線上",2,0.56],["巷弄美食家",2,0.14]],"TTV-F":[["股市即時通",1,0.18]]}}}}}};
+
+// Save/load from localStorage for persistence
+function saveDB(){try{localStorage.setItem('tvc_db',JSON.stringify(DB));}catch(e){}}
+function loadDB(){
+  try{
+    var s=localStorage.getItem('tvc_db');
+    if(s){var parsed=JSON.parse(s);
+      // Merge: add any products/months from localStorage not in initial data
+      Object.keys(parsed.products).forEach(function(p){
+        if(!DB.products[p])DB.products[p]=parsed.products[p];
+        else{
+          Object.keys(parsed.products[p].months||{}).forEach(function(m){
+            if(!DB.products[p].months[m])DB.products[p].months[m]=parsed.products[p].months[m];
+          });
+        }
+      });
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// STATE
+// ============================================================
+var curProd='EX', curMonth='all', curTab='ov';
+var CH={};  // chart registry
+var PAL=['#2563eb','#0d9488','#d97706','#dc2626','#7c3aed','#16a34a','#0891b2','#be185d','#92400e','#1e3a5f'];
+var PAA=PAL.map(function(c){return c+'bb';});
+function C(i){return PAL[i%10];} function CA(i){return PAA[i%10];}
+
+// ============================================================
+// DATA ACCESS — merges months for current selection
+// ============================================================
+function getProd(){return DB.products[curProd]||null;}
+function getMonths(){
+  var p=getProd(); if(!p)return [];
+  var ms=Object.keys(p.months||{}).sort();
+  return curMonth==='all'?ms:(ms.indexOf(curMonth)>=0?[curMonth]:[]);
+}
+function fmtMonth(ym){return ym.slice(0,4)+'/'+ym.slice(4);}
+
+// Merge data across selected months
+function getMerged(){
+  var p=getProd(); if(!p)return null;
+  var months=getMonths(); if(!months.length)return null;
+  if(months.length===1)return p.months[months[0]];
+  // Multi-month merge
+  var m={matTotals:{},dailyMat:{},chTotals:{},chMat:{},callMat:{},dailyCalls:{},dailyCC:{},timeCC:{},timeCalls:{cc:{},mat:{}},progTop:{}};
+  months.forEach(function(mo){
+    var d=p.months[mo]; if(!d)return;
+    // matTotals
+    Object.keys(d.matTotals||{}).forEach(function(k){
+      if(!m.matTotals[k])m.matTotals[k]={s:0,tvr:0};
+      m.matTotals[k].s+=d.matTotals[k].s; m.matTotals[k].tvr=r2(m.matTotals[k].tvr+d.matTotals[k].tvr);
+    });
+    // dailyMat
+    Object.keys(d.dailyMat||{}).forEach(function(dt){
+      if(!m.dailyMat[dt])m.dailyMat[dt]={};
+      Object.keys(d.dailyMat[dt]).forEach(function(mat){
+        m.dailyMat[dt][mat]=(m.dailyMat[dt][mat]||0)+d.dailyMat[dt][mat];
+      });
+    });
+    // chTotals
+    Object.keys(d.chTotals||{}).forEach(function(cc){
+      if(!m.chTotals[cc])m.chTotals[cc]={name:d.chTotals[cc].name,s:0,tvr:0};
+      m.chTotals[cc].s+=d.chTotals[cc].s; m.chTotals[cc].tvr=r2(m.chTotals[cc].tvr+d.chTotals[cc].tvr);
+    });
+    // chMat
+    Object.keys(d.chMat||{}).forEach(function(mat){
+      if(!m.chMat[mat])m.chMat[mat]={};
+      Object.keys(d.chMat[mat]).forEach(function(ch){
+        if(!m.chMat[mat][ch])m.chMat[mat][ch]={s:0,tvr:0};
+        m.chMat[mat][ch].s+=d.chMat[mat][ch].s; m.chMat[mat][ch].tvr=r2(m.chMat[mat][ch].tvr+d.chMat[mat][ch].tvr);
+      });
+    });
+    // callMat
+    Object.keys(d.callMat||{}).forEach(function(p2){
+      if(!m.callMat[p2])m.callMat[p2]={tc:0,vc:0,o:0,pk:0};
+      var c=d.callMat[p2]; m.callMat[p2].tc+=c.tc; m.callMat[p2].vc+=c.vc; m.callMat[p2].o+=c.o; m.callMat[p2].pk+=c.pk;
+    });
+    // dailyCalls
+    Object.keys(d.dailyCalls||{}).forEach(function(dt){
+      if(!m.dailyCalls[dt])m.dailyCalls[dt]={};
+      Object.keys(d.dailyCalls[dt]).forEach(function(ph){
+        m.dailyCalls[dt][ph]=(m.dailyCalls[dt][ph]||0)+d.dailyCalls[dt][ph];
+      });
+    });
+    // dailyCC
+    Object.keys(d.dailyCC||{}).forEach(function(dt){
+      if(!m.dailyCC[dt])m.dailyCC[dt]={};
+      Object.keys(d.dailyCC[dt]).forEach(function(cc){
+        if(!m.dailyCC[dt][cc])m.dailyCC[dt][cc]={s:0,tvr:0};
+        m.dailyCC[dt][cc].s+=d.dailyCC[dt][cc].s; m.dailyCC[dt][cc].tvr=r2(m.dailyCC[dt][cc].tvr+d.dailyCC[dt][cc].tvr);
+      });
+    });
+    // timeCC
+    Object.keys(d.timeCC||{}).forEach(function(cc){
+      if(!m.timeCC[cc])m.timeCC[cc]={};
+      Object.keys(d.timeCC[cc]).forEach(function(b){
+        if(!m.timeCC[cc][b])m.timeCC[cc][b]={s:0,tvr:0};
+        m.timeCC[cc][b].s+=d.timeCC[cc][b].s; m.timeCC[cc][b].tvr=r2(m.timeCC[cc][b].tvr+d.timeCC[cc][b].tvr);
+      });
+    });
+    // timeCalls
+    var tc=d.timeCalls||{};
+    ['cc','mat'].forEach(function(type){
+      Object.keys(tc[type]||{}).forEach(function(k){
+        if(!m.timeCalls[type][k])m.timeCalls[type][k]={};
+        Object.keys(tc[type][k]).forEach(function(b){
+          m.timeCalls[type][k][b]=(m.timeCalls[type][k][b]||0)+tc[type][k][b];
+        });
+      });
+    });
+    // progTop: take latest month's data (can't meaningfully merge ranked lists)
+    if(d.progTop)m.progTop=d.progTop;
+  });
+  return m;
+}
+
+function getDates(){
+  var d=getMerged(); if(!d)return [];
+  return Object.keys(d.dailyMat||{}).sort();
+}
+function getMats(){
+  var d=getMerged(); if(!d)return [];
+  return Object.keys(d.matTotals||{}).sort();
+}
+
+// Phone map for current product
+function getPhoneMap(){var p=getProd();return p?p.phoneMap:{};}
+function getMP(){var pm=getPhoneMap(),r={};Object.keys(pm).forEach(function(p){r[pm[p]]=p;});return r;}
+
+// CC↔Name maps from merged chTotals
+function getCC2N(){var d=getMerged(),r={};if(d)Object.keys(d.chTotals||{}).forEach(function(cc){r[cc]=d.chTotals[cc].name;});return r;}
+function getN2CC(){var c=getCC2N(),r={};Object.keys(c).forEach(function(cc){r[c[cc]]=cc;});return r;}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function dc(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
+function sn(m){return m.replace(/^\d{6}/,'').trim()||m;}
+function r2(v){return Math.round(v*100)/100;}
+function rset(id,v){var el=document.getElementById(id);if(el)el.value=v;}
+function leg(id,lbls,cols){var el=document.getElementById(id);if(!el)return;el.innerHTML=lbls.map(function(l,i){return'<span><span class="dot" style="background:'+cols[i%10]+'"></span>'+l+'</span>';}).join('');}
+function bar(w,c){return'<span class="bg"><span class="bf" style="width:'+w+'px;background:'+c+'"></span></span>';}
+function mc(cls,lbl,val,sub){return'<div class="mc '+cls+'"><div class="lbl">'+lbl+'</div><div class="val">'+val+'</div><div class="sub">'+sub+'</div></div>';}
+function callTots(matFilter){
+  var d=getMerged();if(!d)return{tc:0,vc:0,o:0};
+  var pm=getPhoneMap(),tot={tc:0,vc:0,o:0};
+  Object.keys(pm).forEach(function(p){
+    if(matFilter&&pm[p]!==matFilter)return;
+    var cm=d.callMat[p];if(!cm)return;
+    tot.tc+=cm.tc;tot.vc+=cm.vc;tot.o+=cm.o;
+  });
+  return tot;
+}
+function callsByDay(matFilter){
+  var d=getMerged();if(!d)return getDates().map(function(){return 0;});
+  var pm=getPhoneMap(),mp=getMP();
+  return getDates().map(function(dt){
+    var dc=d.dailyCalls[dt]||{};
+    if(matFilter){var ph=mp[matFilter];return ph?(dc[ph]||0):0;}
+    return Object.keys(pm).reduce(function(a,p){return a+(dc[p]||0);},0);
+  });
+}
+
+// Channel select helpers
+function getCCs(mat){
+  var cc2n=getCC2N(),n2cc=getN2CC(),d=getMerged();
+  if(!mat)return Object.keys(cc2n).sort(function(a,b){return(cc2n[a]||a).localeCompare(cc2n[b]||b,'zh-TW');});
+  var chs=Object.keys((d&&d.chMat&&d.chMat[mat])||{});
+  return chs.map(function(ch){return n2cc[ch]||ch;}).filter(Boolean).sort(function(a,b){return(cc2n[a]||a).localeCompare(cc2n[b]||b,'zh-TW');});
+}
+function fillChSel(id,ccs,prev){
+  var el=document.getElementById(id),cc2n=getCC2N();if(!el)return;
+  el.innerHTML='<option value="">全部</option>';
+  ccs.forEach(function(cc){var o=document.createElement('option');o.value=cc;o.textContent=(cc2n[cc]||cc)+' ('+cc+')';el.appendChild(o);});
+  el.value=(prev&&ccs.indexOf(prev)>=0)?prev:'';
+}
+function updChSel(){fillChSel('s-ch',getCCs(document.getElementById('s-chm').value),document.getElementById('s-ch').value);}
+function updTrChSel(){fillChSel('s-trc',getCCs(document.getElementById('s-trm').value),document.getElementById('s-trc').value);}
+
+// ============================================================
+// PANEL SELECTS — rebuild when product/month changes
+// ============================================================
+function rebuildSelects(){
+  var mats=getMats();
+  var allCCs=getCCs('');
+  ['s-mt','s-trm','s-chm'].forEach(function(id){
+    var el=document.getElementById(id);if(!el)return;
+    var prev=el.value;
+    el.innerHTML='<option value="">全部</option>';
+    mats.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=sn(m);el.appendChild(o);});
+    el.value=(mats.indexOf(prev)>=0)?prev:'';
+  });
+  fillChSel('s-ch',allCCs,'');
+  fillChSel('s-trc',allCCs,'');
+}
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+function rOv(){
+  var d=getMerged();
+  var p=getProd();
+  var note=document.getElementById('ov-note');
+  if(!d||!p){
+    note.style.display='block';
+    note.textContent='請從上方選擇商品與月份';
+    document.getElementById('ov-cards').innerHTML='';
+    ['c-ms','c-mc','c-ds'].forEach(dc);
+    document.getElementById('t-ov').innerHTML='<tr><td class="empty">無資料</td></tr>';
+    return;
+  }
+  var months=getMonths();
+  var monthLabel=curMonth==='all'?'全部月份':fmtMonth(curMonth);
+  note.style.display='block';
+  note.textContent='✅ '+p.name+' · '+monthLabel+'  監播與來電資料均已載入，可直接對應分析。';
+
+  var ct=callTots('');
+  var mats=getMats();
+  var totalS=Object.values(d.matTotals).reduce(function(a,v){return a+v.s;},0);
+  var totalTVR=Object.values(d.matTotals).reduce(function(a,v){return a+v.tvr;},0);
+  document.getElementById('ov-cards').innerHTML=
+    mc('bl','總投遞檔次',totalS.toLocaleString(),monthLabel)+
+    mc('tl','累計 TVR',totalTVR.toFixed(1),'各檔次加總')+
+    mc('am','總來電數',ct.tc.toLocaleString(),monthLabel)+
+    mc('gr','有效來電',ct.vc.toLocaleString(),'有效率 '+Math.round(ct.vc/Math.max(ct.tc,1)*100)+'%')+
+    mc('pu','訂單數',ct.o.toLocaleString(),'轉換率 '+Math.round(ct.o/Math.max(ct.tc,1)*1000)/10+'%')+
+    mc('co','素材數',mats.length+'','有投放記錄');
+
+  dc('c-ms');CH['c-ms']=new Chart(document.getElementById('c-ms'),{type:'bar',
+    data:{labels:mats.map(sn),datasets:[{label:'檔次',data:mats.map(function(m){return(d.matTotals[m]||{s:0}).s;}),backgroundColor:mats.map(function(_,i){return CA(i);}),borderColor:mats.map(function(_,i){return C(i);}),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:function(it){return mats[it[0].dataIndex];}}}},scales:{x:{ticks:{font:{size:10},maxRotation:40,autoSkip:false}},y:{beginAtZero:true}}}});
+
+  var pm=getPhoneMap();var cMats=mats.filter(function(m){var cm=d.callMat[getMP()[m]];return cm&&cm.tc>0;});
+  dc('c-mc');CH['c-mc']=new Chart(document.getElementById('c-mc'),{type:'bar',
+    data:{labels:cMats.map(sn),datasets:[
+      {label:'來電',data:cMats.map(function(m){var cm=d.callMat[getMP()[m]];return cm?cm.tc:0;}),backgroundColor:CA(2),borderColor:C(2),borderWidth:1,borderRadius:3},
+      {label:'訂單',data:cMats.map(function(m){var cm=d.callMat[getMP()[m]];return cm?cm.o:0;}),backgroundColor:CA(4),borderColor:C(4),borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:8}}},scales:{x:{ticks:{font:{size:10},maxRotation:40,autoSkip:false}},y:{beginAtZero:true}}}});
+
+  var dates=getDates();
+  var dsArr=mats.map(function(m,i){return{label:sn(m),data:dates.map(function(dt){return(d.dailyMat[dt]&&d.dailyMat[dt][m])||0;}),borderColor:C(i),backgroundColor:CA(i),tension:.3,pointRadius:1.5,fill:false};});
+  leg('leg-ov',mats.map(sn),PAL);
+  dc('c-ds');CH['c-ds']=new Chart(document.getElementById('c-ds'),{type:'line',
+    data:{labels:dates.map(function(dt){return dt.slice(5);}),datasets:dsArr},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true}},interaction:{mode:'index',intersect:false}}});
+
+  var rows=mats.map(function(m){var b=d.matTotals[m]||{s:0,tvr:0};var cm=d.callMat[getMP()[m]]||{tc:0,vc:0,o:0};return{m:m,s:b.s,tvr:b.tvr,tc:cm.tc,vc:cm.vc,o:cm.o};}).sort(function(a,b){return b.tc-a.tc;});
+  var mxS=Math.max.apply(null,rows.map(function(r){return r.s;}))||1;var mxC=Math.max.apply(null,rows.map(function(r){return r.tc;}))||1;
+  document.getElementById('t-ov').innerHTML='<thead><tr><th>#</th><th>素材</th><th>投遞檔次</th><th>TVR</th><th>來電</th><th>有效</th><th>訂單</th></tr></thead><tbody>'+
+    rows.map(function(r,i){var rc=i<3?['g1','g2','g3'][i]:'';var ws=Math.round(r.s/mxS*54);var wc=Math.round(r.tc/mxC*54);
+      return'<tr class="cl" onclick="jumpMat(\''+r.m+'\')">'+'<td><span class="rn '+rc+'">'+(i+1)+'</span></td>'+'<td><span class="mn" title="'+r.m+'">'+sn(r.m)+'</span></td>'+'<td>'+r.s+bar(ws,C(0))+'</td><td>'+r.tvr.toFixed(1)+'</td><td>'+r.tc+bar(wc,C(2))+'</td><td>'+r.vc+'</td><td>'+r.o+'</td></tr>';
+    }).join('')+'</tbody>';
+}
+function jumpMat(m){rset('s-mt',m);go('mt');}
+
+// ============================================================
+// MATERIAL
+// ============================================================
+function rMt(){
+  var d=getMerged();if(!d){document.getElementById('t-mt').innerHTML='<tr><td class="empty">無資料</td></tr>';return;}
+  var selM=document.getElementById('s-mt').value;
+  var sk=document.getElementById('s-mm').value||'s';
+  var fh=document.getElementById('fh-mt');
+  if(selM){fh.style.display='inline';fh.textContent=sn(selM);}else fh.style.display='none';
+  document.getElementById('h-mtr').textContent=selM?sn(selM)+' 效益詳情':'素材效益排行';
+  document.getElementById('h-mch').textContent=selM?sn(selM)+' 頻道分布':'頻道投遞 TOP14';
+  document.getElementById('h-mdt').textContent=selM?sn(selM)+' 每日趨勢':'各素材每日趨勢';
+  var mats=getMats();
+  var rows=mats.map(function(m){var b=d.matTotals[m]||{s:0,tvr:0};var cm=d.callMat[getMP()[m]]||{tc:0,vc:0,o:0};return{m:m,s:b.s,tvr:b.tvr,tc:cm.tc,vc:cm.vc,o:cm.o};});
+  rows.sort(function(a,b){return b[sk]-a[sk];});
+  var mxV=rows[0]?rows[0][sk]:1;var bc={s:C(0),tvr:C(1),tc:C(2),o:C(4)};
+  document.getElementById('t-mt').innerHTML='<thead><tr><th>#</th><th>素材</th><th>檔次</th><th>TVR</th><th>來電</th><th>有效</th><th>訂單</th></tr></thead><tbody>'+
+    rows.map(function(r,i){var rc=i<3?['g1','g2','g3'][i]:'';var hl=selM===r.m?' style="background:var(--bl)"':'';var v=r[sk];var w=mxV>0?Math.round(v/mxV*54):0;
+      return'<tr class="cl"'+hl+' onclick="togMat(\''+r.m+'\')">'+'<td><span class="rn '+rc+'">'+(i+1)+'</span></td>'+'<td><span class="mn" title="'+r.m+'">'+sn(r.m)+'</span></td>'+'<td>'+r.s+(sk==='s'?bar(w,bc.s):'')+'</td>'+'<td>'+r.tvr.toFixed(1)+(sk==='tvr'?bar(w,bc.tvr):'')+'</td>'+'<td>'+r.tc+(sk==='tc'?bar(w,bc.tc):'')+'</td>'+'<td>'+r.vc+'</td>'+'<td>'+r.o+(sk==='o'?bar(w,bc.o):'')+'</td></tr>';
+    }).join('')+'</tbody>';
+  var chData={};var mList=selM?[selM]:mats;
+  mList.forEach(function(m){Object.entries(d.chMat[m]||{}).forEach(function(e){if(!chData[e[0]])chData[e[0]]={s:0,tvr:0};chData[e[0]].s+=e[1].s;chData[e[0]].tvr+=e[1].tvr;});});
+  var chL=Object.keys(chData).sort(function(a,b){return chData[b].s-chData[a].s;}).slice(0,14);
+  dc('c-mch');CH['c-mch']=new Chart(document.getElementById('c-mch'),{type:'bar',
+    data:{labels:chL,datasets:[{label:'檔次',data:chL.map(function(ch){return chData[ch].s;}),backgroundColor:chL.map(function(_,i){return CA(i);}),borderColor:chL.map(function(_,i){return C(i);}),borderWidth:1,borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{ticks:{font:{size:10}}}}}});
+  var dates=getDates();var matDs=mList.map(function(m,i){return{label:sn(m),data:dates.map(function(dt){return(d.dailyMat[dt]&&d.dailyMat[dt][m])||0;}),borderColor:C(i),backgroundColor:CA(i),tension:.3,pointRadius:2,fill:false};});
+  dc('c-mdt');CH['c-mdt']=new Chart(document.getElementById('c-mdt'),{type:'line',
+    data:{labels:dates.map(function(dt){return dt.slice(5);}),datasets:matDs},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:mList.length>1,labels:{font:{size:9},boxWidth:7}}},scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true}},interaction:{mode:'index',intersect:false}}});
+}
+function togMat(m){var s=document.getElementById('s-mt');s.value=(s.value===m?'':m);rMt();}
+
+// ============================================================
+// CHANNEL
+// ============================================================
+function rCh(){
+  var d=getMerged();if(!d){document.getElementById('t-ch').innerHTML='<tr><td class="empty">無資料</td></tr>';return;}
+  var selC=document.getElementById('s-ch').value;
+  var selM=document.getElementById('s-chm').value;
+  var cc2n=getCC2N(),n2cc=getN2CC();
+  var fh=document.getElementById('fh-ch');var parts=[];
+  if(selC)parts.push(cc2n[selC]||selC);if(selM)parts.push(sn(selM));
+  if(parts.length){fh.style.display='inline';fh.textContent=parts.join(' + ');}else fh.style.display='none';
+  var dates=getDates();
+  var chData={};
+  getMats().forEach(function(m){
+    if(selM&&m!==selM)return;
+    Object.entries(d.chMat[m]||{}).forEach(function(e){var ch=e[0],v=e[1];var cc=n2cc[ch];if(!cc)return;if(selC&&cc!==selC)return;
+      if(!chData[cc])chData[cc]={name:ch,s:0,tvr:0};chData[cc].s+=v.s;chData[cc].tvr+=v.tvr;});
+  });
+  var chRows=Object.entries(chData).sort(function(a,b){return b[1].s-a[1].s;});
+  var showCCs=selC?[selC]:chRows.slice(0,5).map(function(r){return r[0];});
+  var totalS=chRows.reduce(function(a,r){return a+r[1].s;},0);
+  var totalTVR=chRows.reduce(function(a,r){return a+r[1].tvr;},0);
+  var ct=callTots(selM);
+  document.getElementById('ch-cards').innerHTML=
+    mc('bl','頻道數',chRows.length+'','有投遞記錄')+
+    mc('tl','投遞檔次',totalS.toLocaleString(),selC?'所選頻道':'全部頻道')+
+    mc('am','累計 TVR',totalTVR.toFixed(1),selC?'所選頻道':'全部頻道')+
+    mc('co','TVR/檔',totalS>0?r2(totalTVR/totalS).toFixed(3):'0','平均每檔收視')+
+    mc('gr','來電數',ct.tc.toLocaleString(),selM?sn(selM):'全部素材');
+  var cDay=callsByDay(selM);
+  var dds=[];
+  document.getElementById('h-ch-d').textContent=selC?(cc2n[selC]||selC)+' 每日投遞 / TVR / 來電':'前5頻道每日投遞 + 來電';
+  if(selC){
+    var spD=dates.map(function(dt){return(d.dailyCC[dt]&&d.dailyCC[dt][selC]&&d.dailyCC[dt][selC].s)||0;});
+    var tvD=dates.map(function(dt){return(d.dailyCC[dt]&&d.dailyCC[dt][selC]&&d.dailyCC[dt][selC].tvr)||0;});
+    dds=[
+      {label:'投遞檔次',data:spD,borderColor:PAL[0],backgroundColor:'transparent',yAxisID:'y',tension:.3,pointRadius:2.5,borderWidth:2},
+      {label:'TVR',data:tvD,borderColor:PAL[1],backgroundColor:'transparent',yAxisID:'y2',tension:.3,pointRadius:2.5,borderWidth:2,borderDash:[6,3]},
+      {label:'來電數',data:cDay,borderColor:PAL[2],backgroundColor:PAL[2]+'33',yAxisID:'y',tension:.3,pointRadius:2.5,borderWidth:2,fill:true},
+    ];
+    leg('leg-ch-d',['投遞檔次','TVR（右軸）','來電數'],[PAL[0],PAL[1],PAL[2]]);
+  }else{
+    showCCs.forEach(function(cc,i){
+      var spD=dates.map(function(dt){return(d.dailyCC[dt]&&d.dailyCC[dt][cc]&&d.dailyCC[dt][cc].s)||0;});
+      dds.push({label:cc2n[cc]||cc,data:spD,borderColor:PAL[i],backgroundColor:'transparent',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:1.5});
+    });
+    dds.push({label:'來電數',data:cDay,borderColor:PAL[5],backgroundColor:PAL[5]+'33',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,fill:true,borderDash:[4,2]});
+    leg('leg-ch-d',showCCs.map(function(cc){return cc2n[cc]||cc;}).concat(['來電數']),PAL);
+  }
+  var scOpt=selC?{y:{beginAtZero:true,title:{display:true,text:'檔次/來電',font:{size:10}}},y2:{beginAtZero:true,position:'right',title:{display:true,text:'TVR',font:{size:10}},grid:{drawOnChartArea:false}}}:{y:{beginAtZero:true,title:{display:true,text:'檔次/來電',font:{size:10}}}};
+  dc('c-ch-d');CH['c-ch-d']=new Chart(document.getElementById('c-ch-d'),{type:'line',
+    data:{labels:dates.map(function(dt){return dt.slice(5);}),datasets:dds},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:scOpt,interaction:{mode:'index',intersect:false}}});
+  var BANDS=['02-06','06-09','09-12','12-15','15-18','18-21','21-25'];
+  var td={};BANDS.forEach(function(b){td[b]={s:0,tvr:0};});
+  var ccsT=selC?[selC]:chRows.map(function(r){return r[0];});
+  ccsT.forEach(function(cc){var tc=d.timeCC[cc]||{};BANDS.forEach(function(b){if(tc[b]){td[b].s+=tc[b].s;td[b].tvr+=tc[b].tvr;}});});
+  var tcData={};BANDS.forEach(function(b){tcData[b]=0;});
+  ccsT.forEach(function(cc){var tc=(d.timeCalls&&d.timeCalls.cc&&d.timeCalls.cc[cc])||{};BANDS.forEach(function(b){tcData[b]+=(tc[b]||0);});});
+  document.getElementById('h-ch-t').textContent=selC?(cc2n[selC]||selC)+' 時段分布':'各頻道時段分布';
+  dc('c-ch-t');CH['c-ch-t']=new Chart(document.getElementById('c-ch-t'),{type:'bar',
+    data:{labels:BANDS.map(function(b){return b+'時';}),datasets:[
+      {type:'bar',label:'投遞檔次',data:BANDS.map(function(b){return td[b].s;}),backgroundColor:PAL[0]+'bb',borderColor:PAL[0],borderWidth:1,borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'TVR',data:BANDS.map(function(b){return r2(td[b].tvr);}),borderColor:PAL[1],backgroundColor:'transparent',tension:.4,pointRadius:5,pointBackgroundColor:PAL[1],borderWidth:2,yAxisID:'y2',fill:false},
+      {type:'line',label:'來電數',data:BANDS.map(function(b){return tcData[b];}),borderColor:PAL[2],backgroundColor:PAL[2]+'33',tension:.4,pointRadius:5,pointBackgroundColor:PAL[2],borderWidth:2,yAxisID:'y3',fill:true},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:8}}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'投遞檔次',font:{size:10}}},y2:{beginAtZero:true,position:'right',title:{display:true,text:'TVR',font:{size:10}},grid:{drawOnChartArea:false}},y3:{beginAtZero:true,position:'right',title:{display:true,text:'來電',font:{size:10}},grid:{drawOnChartArea:false},offset:true}}}});
+  var mxS=chRows[0]?chRows[0][1].s:1;
+  document.getElementById('t-ch').innerHTML='<thead><tr><th>#</th><th>頻道</th><th>檔次</th><th>TVR</th><th>TVR/檔</th></tr></thead><tbody>'+
+    chRows.slice(0,15).map(function(r,i){var cc=r[0],v=r[1];var per=v.s>0?r2(v.tvr/v.s).toFixed(3):0;var ws=Math.round(v.s/mxS*54);var rc=i<3?['g1','g2','g3'][i]:'';var hl=selC===cc?' style="background:var(--bl)"':'';
+      return'<tr class="cl"'+hl+' onclick="togCh(\''+cc+'\')">'+'<td><span class="rn '+rc+'">'+(i+1)+'</span></td>'+'<td title="'+cc+'">'+v.name+'</td>'+'<td>'+v.s+bar(ws,C(0))+'</td>'+'<td>'+v.tvr.toFixed(2)+'</td><td>'+per+'</td></tr>';
+    }).join('')+'</tbody>';
+  rProgTables(selC,selM);
+}
+function togCh(cc){var s=document.getElementById('s-ch');s.value=(s.value===cc?'':cc);rCh();}
+
+function rProgTables(selC,selM){
+  var d=getMerged();
+  var sec=document.getElementById('prog-section');
+  if(!selC&&!selM){sec.style.display='none';return;}
+  var n2cc=getN2CC();
+  var ccs;
+  if(selC){ccs=[selC];}
+  else{ccs=Object.keys((d&&d.chMat&&d.chMat[selM])||{}).map(function(ch){return n2cc[ch];}).filter(Boolean);}
+  var merged={};
+  ccs.forEach(function(cc){((d&&d.progTop&&d.progTop[cc])||[]).forEach(function(r){if(!merged[r[0]])merged[r[0]]=[r[0],0,0];merged[r[0]][1]+=r[1];merged[r[0]][2]=r2(merged[r[0]][2]+r[2]);});});
+  var progs=Object.values(merged);
+  if(!progs.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  var cc2n=getCC2N();
+  var scopeName=selC?(cc2n[selC]||selC):(selM?sn(selM):'');
+  var byS=progs.slice().sort(function(a,b){return b[1]-a[1];}).slice(0,12);
+  var byT=progs.slice().sort(function(a,b){return b[2]-a[2];}).slice(0,12);
+  var maxS=byS[0]?byS[0][1]:1,maxT=byT[0]?byT[0][2]:1;
+  var hdr='<thead><tr><th>#</th><th>節目名稱</th><th>檔次</th><th>TVR</th></tr></thead><tbody>';
+  document.getElementById('h-prog-s').textContent=scopeName+' — 投遞檔次排行';
+  document.getElementById('t-prog-s').innerHTML=hdr+byS.map(function(r,i){var w=Math.round(r[1]/maxS*54);var rc=i<3?['g1','g2','g3'][i]:'';return'<tr><td><span class="rn '+rc+'">'+(i+1)+'</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r[0]+'">'+r[0]+'</td><td>'+r[1]+bar(w,C(0))+'</td><td>'+r[2]+'</td></tr>';}).join('')+'</tbody>';
+  document.getElementById('h-prog-t').textContent=scopeName+' — TVR 收視排行';
+  document.getElementById('t-prog-t').innerHTML=hdr+byT.map(function(r,i){var w=Math.round(r[2]/maxT*54);var rc=i<3?['g1','g2','g3'][i]:'';return'<tr><td><span class="rn '+rc+'">'+(i+1)+'</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r[0]+'">'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+bar(w,C(1))+'</td></tr>';}).join('')+'</tbody>';
+}
+
+// ============================================================
+// TREND
+// ============================================================
+function rTr(){
+  var d=getMerged();if(!d)return;
+  var selM=document.getElementById('s-trm').value;
+  var selCC=document.getElementById('s-trc').value;
+  var dates=getDates();
+  var spotsArr=dates.map(function(dt){
+    if(selCC)return(d.dailyCC[dt]&&d.dailyCC[dt][selCC]&&d.dailyCC[dt][selCC].s)||0;
+    if(selM)return(d.dailyMat[dt]&&d.dailyMat[dt][selM])||0;
+    return getMats().reduce(function(a,m){return a+((d.dailyMat[dt]&&d.dailyMat[dt][m])||0);},0);
+  });
+  var tvrArr=dates.map(function(dt){var dcc=d.dailyCC[dt]||{};var ccs=selCC?[selCC]:Object.keys(dcc);return r2(ccs.reduce(function(a,cc){return a+(dcc[cc]?dcc[cc].tvr:0);},0));});
+  var callsArr=callsByDay(selM);
+  var mp=getMP();
+  var ordArr=dates.map(function(dt){var dc=d.dailyCalls[dt]||{};if(selM){var p=mp[selM];var cm=d.callMat[p];if(p&&cm&&cm.tc>0)return Math.round((dc[p]||0)*(cm.o/cm.tc));}return Object.keys(getPhoneMap()).reduce(function(a,p){var cm=d.callMat[p];if(cm&&cm.tc>0)return a+Math.round((dc[p]||0)*(cm.o/cm.tc));return a;},0);});
+  leg('leg-tr',['投遞檔次','TVR（右軸）','來電數','訂單（估）'],[PAL[0],PAL[1],PAL[2],PAL[4]]);
+  dc('c-tr');CH['c-tr']=new Chart(document.getElementById('c-tr'),{type:'line',
+    data:{labels:dates.map(function(dt){return dt.slice(5);}),datasets:[
+      {label:'投遞檔次',data:spotsArr,borderColor:PAL[0],backgroundColor:'transparent',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2},
+      {label:'TVR',data:tvrArr,borderColor:PAL[1],backgroundColor:'transparent',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,borderDash:[6,3]},
+      {label:'來電數',data:callsArr,borderColor:PAL[2],backgroundColor:PAL[2]+'22',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,fill:true},
+      {label:'訂單',data:ordArr,borderColor:PAL[4],backgroundColor:'transparent',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'檔次/來電/訂單',font:{size:10}}},y2:{beginAtZero:true,position:'right',title:{display:true,text:'TVR',font:{size:10}},grid:{drawOnChartArea:false}}},interaction:{mode:'index',intersect:false}}});
+  var phones=Object.keys(getPhoneMap()).filter(function(p){return Object.values(d.dailyCalls).some(function(dc){return dc[p]>0;});});
+  var cDs=phones.map(function(p,i){var mat=getPhoneMap()[p];return{label:sn(mat),data:dates.map(function(dt){return(d.dailyCalls[dt]&&d.dailyCalls[dt][p])||0;}),backgroundColor:CA(i),borderColor:C(i),fill:true,tension:.2,pointRadius:1};});
+  leg('leg-cs',cDs.map(function(x){return x.label;}),PAL);
+  dc('c-cs');CH['c-cs']=new Chart(document.getElementById('c-cs'),{type:'line',
+    data:{labels:dates.map(function(dt){return dt.slice(5);}),datasets:cDs},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true,stacked:true}},interaction:{mode:'index',intersect:false}}});
+}
+
+// ============================================================
+// IMPORT
+// ============================================================
+function rIm(){
+  var wrap=document.getElementById('im-status-wrap');
+  var rows='';
+  Object.keys(DB.products).forEach(function(pk){
+    var prod=DB.products[pk];
+    var months=Object.keys(prod.months||{}).sort();
+    if(!months.length){rows+='<tr><td>'+prod.name+'</td><td colspan="3" style="color:var(--ink3)">尚無資料</td></tr>';return;}
+    months.forEach(function(mo,i){
+      var m=prod.months[mo];
+      var mats=Object.keys(m.matTotals||{}).length;
+      var phones=Object.keys(m.callMat||{}).length;
+      rows+='<tr>'+(i===0?'<td rowspan="'+months.length+'">'+prod.name+'</td>':'')+'<td><span class="stag ok">'+fmtMonth(mo)+'</span></td><td>'+mats+' 支素材</td><td>'+phones+' 支電話</td></tr>';
+    });
+  });
+  wrap.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">商品</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">月份</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">監播</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">來電</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  // Phone map editor
+  var pk=document.getElementById('im-prod').value;
+  var pm=DB.products[pk]?DB.products[pk].phoneMap:{};
+  var ed=document.getElementById('phone-map-editor');
+  ed.innerHTML=Object.keys(pm).map(function(p,i){return '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center"><input type="text" value="'+p+'" placeholder="電話 (如 070-585)" style="border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:12px;width:130px" data-pi="'+i+'"><span style="color:var(--ink3)">→</span><input type="text" value="'+pm[p]+'" placeholder="素材名稱" style="border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:12px;flex:1" data-mi="'+i+'"></div>';}).join('');
+}
+
+function addPhoneRow(){
+  var ed=document.getElementById('phone-map-editor');
+  var i=ed.children.length;
+  var d=document.createElement('div');
+  d.style.cssText='display:flex;gap:8px;margin-bottom:6px;align-items:center';
+  d.innerHTML='<input type="text" placeholder="電話 (如 070-585)" style="border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:12px;width:130px" data-pi="'+i+'"><span style="color:var(--ink3)">→</span><input type="text" placeholder="素材名稱" style="border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:12px;flex:1" data-mi="'+i+'">';
+  ed.appendChild(d);
+}
+
+function getEditorPhoneMap(){
+  var ed=document.getElementById('phone-map-editor');
+  var pm={};
+  var phones=ed.querySelectorAll('[data-pi]');
+  var mats=ed.querySelectorAll('[data-mi]');
+  phones.forEach(function(el,i){var p=el.value.trim(),m=mats[i].value.trim();if(p&&m)pm[p]=m;});
+  return pm;
+}
+
+function ensureProduct(pk, name, pm){
+  if(!DB.products[pk]){DB.products[pk]={name:name||pk,phoneMap:pm||{},months:{}};}
+  else{if(pm&&Object.keys(pm).length)DB.products[pk].phoneMap=pm;}
+}
+
+function hBC(e){
+  var file=e.target.files[0];if(!file)return;
+  var msg=document.getElementById('msg-bc');msg.textContent='讀取中...';
+  var pk=document.getElementById('im-prod').value;
+  var pname=document.getElementById('im-prod-name').value.trim()||pk;
+  var moInput=document.getElementById('im-month').value;  // "2026-06"
+  var mo=moInput?moInput.replace('-',''):'';              // "202606"
+  if(!mo){msg.innerHTML='<span class="stag er">請先選月份</span>';return;}
+  var pm=getEditorPhoneMap();
+  ensureProduct(pk,pname,pm);
+  if(!DB.products[pk].months[mo])DB.products[pk].months[mo]=initMonth();
+  var mdata=DB.products[pk].months[mo];
+  Papa.parse(file,{header:true,skipEmptyLines:true,complete:function(res){
+    try{var n=0;res.data.forEach(function(r){
+      var m=r['素材']||r['material'],dt=r['日期']||r['date'],ch=r['頻道名稱']||r['channel'],cc=r['頻道代碼']||r['channel_code'],s=parseInt(r['檔次數']||r['spots'])||0,tvr=parseFloat(r['TVR']||r['tvr'])||0;
+      if(!m||!dt||!s)return;
+      if(!mdata.matTotals[m])mdata.matTotals[m]={s:0,tvr:0};mdata.matTotals[m].s+=s;mdata.matTotals[m].tvr=r2(mdata.matTotals[m].tvr+tvr);
+      if(!mdata.dailyMat[dt])mdata.dailyMat[dt]={};mdata.dailyMat[dt][m]=(mdata.dailyMat[dt][m]||0)+s;
+      if(ch){if(!mdata.chMat[m])mdata.chMat[m]={};if(!mdata.chMat[m][ch])mdata.chMat[m][ch]={s:0,tvr:0};mdata.chMat[m][ch].s+=s;mdata.chMat[m][ch].tvr=r2(mdata.chMat[m][ch].tvr+tvr);}
+      if(cc&&ch){if(!mdata.chTotals[cc])mdata.chTotals[cc]={name:ch,s:0,tvr:0};mdata.chTotals[cc].s+=s;mdata.chTotals[cc].tvr=r2(mdata.chTotals[cc].tvr+tvr);}
+      if(cc){if(!mdata.dailyCC[dt])mdata.dailyCC[dt]={};if(!mdata.dailyCC[dt][cc])mdata.dailyCC[dt][cc]={s:0,tvr:0};mdata.dailyCC[dt][cc].s+=s;mdata.dailyCC[dt][cc].tvr=r2(mdata.dailyCC[dt][cc].tvr+tvr);}
+      n++;});
+      saveDB();refreshProdMonthSelects();
+      msg.innerHTML='<span class="stag ok">✓ 新增 '+n+' 筆</span>';rIm();
+    }catch(err){msg.innerHTML='<span class="stag er">格式錯誤</span>';}
+  }});
+}
+
+function hCall(e){
+  var file=e.target.files[0];if(!file)return;
+  var msg=document.getElementById('msg-call');msg.textContent='讀取中...';
+  var pk=document.getElementById('im-prod').value;
+  var pname=document.getElementById('im-prod-name').value.trim()||pk;
+  var moInput=document.getElementById('im-month').value;
+  var mo=moInput?moInput.replace('-',''):'';
+  if(!mo){msg.innerHTML='<span class="stag er">請先選月份</span>';return;}
+  var pm=getEditorPhoneMap();
+  ensureProduct(pk,pname,pm);
+  if(!DB.products[pk].months[mo])DB.products[pk].months[mo]=initMonth();
+  var mdata=DB.products[pk].months[mo];
+  Papa.parse(file,{header:true,skipEmptyLines:true,complete:function(res){
+    try{var n=0;res.data.forEach(function(r){
+      var dt=r['日期']||r['date'],p=r['電話']||r['phone'],tc=parseInt(r['總來電']||r['total_calls'])||0,vc=parseInt(r['有效來電']||r['valid_calls'])||0,o=parseInt(r['訂單數']||r['orders'])||0,pk2=parseInt(r['包數']||r['packages'])||0;
+      if(!dt||!p||(tc===0&&vc===0))return;
+      if(!mdata.callMat[p])mdata.callMat[p]={tc:0,vc:0,o:0,pk:0};mdata.callMat[p].tc+=tc;mdata.callMat[p].vc+=vc;mdata.callMat[p].o+=o;mdata.callMat[p].pk+=pk2;
+      if(!mdata.dailyCalls[dt])mdata.dailyCalls[dt]={};mdata.dailyCalls[dt][p]=(mdata.dailyCalls[dt][p]||0)+tc;n++;});
+      saveDB();refreshProdMonthSelects();
+      msg.innerHTML='<span class="stag ok">✓ 新增 '+n+' 筆</span>';rIm();
+    }catch(err){msg.innerHTML='<span class="stag er">格式錯誤</span>';}
+  }});
+}
+
+function initMonth(){return{matTotals:{},dailyMat:{},chTotals:{},chMat:{},callMat:{},dailyCalls:{},dailyCC:{},timeCC:{},timeCalls:{cc:{},mat:{}},progTop:{}};}
+
+// ============================================================
+// TOP BAR — product + month selects
+// ============================================================
+function refreshProdMonthSelects(){
+  var sp=document.getElementById('sel-prod');
+  var prev=sp.value;
+  sp.innerHTML='<option value="">選擇商品</option>';
+  Object.keys(DB.products).forEach(function(pk){
+    var o=document.createElement('option');o.value=pk;o.textContent=DB.products[pk].name;sp.appendChild(o);
+  });
+  if(prev&&DB.products[prev])sp.value=prev;
+  refreshMonthSelect();
+}
+
+function refreshMonthSelect(){
+  var sm=document.getElementById('sel-month');
+  var prev=sm.value;
+  sm.innerHTML='<option value="all">全部月份</option>';
+  var p=getProd();
+  if(p){Object.keys(p.months||{}).sort().forEach(function(mo){var o=document.createElement('option');o.value=mo;o.textContent=fmtMonth(mo);sm.appendChild(o);});}
+  sm.value=(prev==='all'||!prev)?'all':(p&&p.months&&p.months[prev]?prev:'all');
+}
+
+function onProdChange(){
+  curProd=document.getElementById('sel-prod').value;
+  curMonth='all';
+  refreshMonthSelect();
+  rebuildSelects();
+  render();
+}
+
+// ============================================================
+// TAB + RENDER
+// ============================================================
+var cur='ov';
+function go(tab){
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.tb').forEach(function(b){b.classList.toggle('on',b.dataset.tab===tab);});
+  document.getElementById('p-'+tab).classList.add('on');cur=tab;render();
+}
+function render(){
+  var p=getProd();
+  if(!p&&cur!=='im'){return;}
+  curProd=document.getElementById('sel-prod').value;
+  curMonth=document.getElementById('sel-month').value||'all';
+  if(cur==='ov')rOv();else if(cur==='mt')rMt();else if(cur==='ch')rCh();else if(cur==='tr')rTr();else if(cur==='im')rIm();
+}
+
+window.addEventListener('load',function(){
+  loadDB();
+  refreshProdMonthSelects();
+  // Auto-select EX if available
+  if(DB.products['EX']){
+    document.getElementById('sel-prod').value='EX';
+    curProd='EX';
+    refreshMonthSelect();
+    document.getElementById('sel-month').value='all';
+    curMonth='all';
+    rebuildSelects();
+  }
+  var attempts=0;
+  function tryInit(){
+    if(typeof Chart!=='undefined'){render();}
+    else if(attempts<50){attempts++;setTimeout(tryInit,100);}
+  }
+  tryInit();
+});
+</script>
+</body>
+</html>
