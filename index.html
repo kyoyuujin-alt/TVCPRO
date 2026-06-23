@@ -209,14 +209,9 @@ tr.cl:hover td{background:var(--bl)}
       <h3>匯入新資料</h3>
       <div class="frow" style="margin-bottom:12px">
         <div class="fg"><label>商品</label>
-          <select id="im-prod">
-            <option value="EX">旋風黃寶</option>
-            <option value="E">芝麻明E</option>
-            <option value="GL">固力伸</option>
-            <option value="OTHER">其他</option>
-          </select>
+          <select id="im-prod" onchange="rIm()"></select>
         </div>
-        <div class="fg"><label>商品名稱（其他時填）</label>
+        <div class="fg" id="im-prod-name-wrap" style="display:none"><label>新商品名稱</label>
           <input type="text" id="im-prod-name" placeholder="例：固力伸" style="border:1px solid var(--bd);border-radius:5px;padding:5px 9px;font-size:12px;width:120px">
         </div>
         <div class="fg"><label>月份</label>
@@ -809,7 +804,33 @@ function rTr(){
 // ============================================================
 // IMPORT
 // ============================================================
+function delMonth(pk,mo){
+  if(!confirm('確定刪除 '+DB.products[pk].name+' '+fmtMonth(mo)+' 的資料？'))return;
+  if(DB.products[pk]&&DB.products[pk].months[mo]){
+    delete DB.products[pk].months[mo];
+    // Remove product if no months left
+    if(!Object.keys(DB.products[pk].months).length) delete DB.products[pk];
+    saveDB();
+    refreshProdMonthSelects();
+    rebuildSelects();
+    render();
+    rIm();
+  }
+}
 function rIm(){
+  // Rebuild im-prod select dynamically
+  var imProd=document.getElementById('im-prod');
+  var prevPk=imProd.value;
+  imProd.innerHTML='';
+  Object.keys(DB.products).forEach(function(pk){
+    var o=document.createElement('option');o.value=pk;o.textContent=DB.products[pk].name;imProd.appendChild(o);
+  });
+  // Add "新增商品" option
+  var oNew=document.createElement('option');oNew.value='__NEW__';oNew.textContent='＋ 新增商品';imProd.appendChild(oNew);
+  if(prevPk&&[...imProd.options].some(function(o){return o.value===prevPk;}))imProd.value=prevPk;
+  // Show/hide name input
+  var nameWrap=document.getElementById('im-prod-name-wrap');
+  if(nameWrap)nameWrap.style.display=imProd.value==='__NEW__'?'flex':'none';
   var wrap=document.getElementById('im-status-wrap');
   var rows='';
   Object.keys(DB.products).forEach(function(pk){
@@ -820,10 +841,11 @@ function rIm(){
       var m=prod.months[mo];
       var mats=Object.keys(m.matTotals||{}).length;
       var phones=Object.keys(m.callMat||{}).length;
-      rows+='<tr>'+(i===0?'<td rowspan="'+months.length+'">'+prod.name+'</td>':'')+'<td><span class="stag ok">'+fmtMonth(mo)+'</span></td><td>'+mats+' 支素材</td><td>'+phones+' 支電話</td></tr>';
+      rows+='<tr>'+(i===0?'<td rowspan="'+months.length+'">'+prod.name+'</td>':'')+'<td><span class="stag ok">'+fmtMonth(mo)+'</span></td><td>'+mats+' 支素材</td><td>'+phones+' 支電話</td>'
+        +'<td><button data-pk="'+pk+'" data-mo="'+mo+'" onclick="delMonth(this.dataset.pk,this.dataset.mo)" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--cl);background:var(--cl);color:var(--cor);cursor:pointer">刪除</button></td></tr>';
     });
   });
-  wrap.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">商品</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">月份</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">監播</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">來電</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  wrap.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">商品</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">月份</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">監播</th><th style="padding:6px 9px;text-align:left;border-bottom:1px solid var(--bd);font-size:9px;color:var(--ink2);text-transform:uppercase">來電</th><th style="padding:6px 9px;border-bottom:1px solid var(--bd)"></th></tr></thead><tbody>'+rows+'</tbody></table>';
   // Phone map editor
   var pk=document.getElementById('im-prod').value;
   var pm=DB.products[pk]?DB.products[pk].phoneMap:{};
@@ -850,8 +872,11 @@ function getEditorPhoneMap(){
 }
 
 function ensureProduct(pk, name, pm){
-  if(!DB.products[pk]){DB.products[pk]={name:name||pk,phoneMap:pm||{},months:{}};}
-  else{if(pm&&Object.keys(pm).length)DB.products[pk].phoneMap=pm;}
+  if(pk==='__NEW__'){pk=(name||'NEW').replace(/[^a-zA-Z0-9一-龥]/g,'_');}
+  var realName=name||pk;
+  if(!DB.products[pk]){DB.products[pk]={name:realName,phoneMap:pm||{},months:{}};}
+  else{if(pm&&Object.keys(pm).length)DB.products[pk].phoneMap=pm;if(name)DB.products[pk].name=realName;}
+  return pk;
 }
 
 function hBC(e){
@@ -863,7 +888,7 @@ function hBC(e){
   var mo=moInput?moInput.replace('-',''):'';
   if(!mo){msg.innerHTML='<span class="stag er">請先選月份</span>';return;}
   var pm=getEditorPhoneMap();
-  ensureProduct(pk,pname,pm);
+  pk=ensureProduct(pk,pname,pm);
   var prev=DB.products[pk].months[mo]||initMonth();
   var fresh=initMonth();
   fresh.callMat=prev.callMat;fresh.dailyCalls=prev.dailyCalls;fresh.timeCalls=prev.timeCalls;
@@ -957,7 +982,7 @@ function hCall(e){
   var mo=moInput?moInput.replace('-',''):'';
   if(!mo){msg.innerHTML='<span class="stag er">請先選月份</span>';return;}
   var pm=getEditorPhoneMap();
-  ensureProduct(pk,pname,pm);
+  pk=ensureProduct(pk,pname,pm);
   if(!DB.products[pk].months[mo])DB.products[pk].months[mo]=initMonth();
   var mdata=DB.products[pk].months[mo];
   mdata.callMat={};mdata.dailyCalls={};mdata.timeCalls={cc:{},mat:{}};
