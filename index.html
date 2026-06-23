@@ -380,7 +380,6 @@ var DB = {"products":{"EX":{"name":"旋風黃寶","phoneMap":{"070-585":"070585�
 // Save/load from localStorage for persistence
 function saveDB(){
   try{localStorage.setItem('tvc_db',JSON.stringify(DB));}catch(e){}
-  saveToFirestore();
 }
 function loadDB(){
   try{
@@ -1090,32 +1089,12 @@ function render(){
 
 window.addEventListener('load',function(){
   loadDB();
-  var fbReady = initFirebase();
-  if(fbReady){
-    loadFromFirestore(function(){
-      refreshProdMonthSelects();
-      if(DB.products['EX']){
-        document.getElementById('sel-prod').value='EX';
-        curProd='EX';
-        refreshMonthSelect();
-        document.getElementById('sel-month').value='all';
-        curMonth='all';
-        rebuildSelects();
-      }
-      var attempts=0;
-      function tryInit(){
-        if(typeof Chart!=='undefined'){render();}
-        else if(attempts<50){attempts++;setTimeout(tryInit,100);}
-      }
-      tryInit();
-    });
-    return;
-  }
   refreshProdMonthSelects();
-  // Auto-select EX if available
-  if(DB.products['EX']){
-    document.getElementById('sel-prod').value='EX';
-    curProd='EX';
+  // Auto-select first available product
+  var firstPk=Object.keys(DB.products)[0]||'EX';
+  if(DB.products[firstPk]){
+    document.getElementById('sel-prod').value=firstPk;
+    curProd=firstPk;
     refreshMonthSelect();
     document.getElementById('sel-month').value='all';
     curMonth='all';
@@ -1127,6 +1106,8 @@ window.addEventListener('load',function(){
     else if(attempts<50){attempts++;setTimeout(tryInit,100);}
   }
   tryInit();
+  // Firebase sync in background (read-only, won't overwrite localStorage)
+  setTimeout(function(){initFirebase();},2000);
 });
 </script>
 </body>
