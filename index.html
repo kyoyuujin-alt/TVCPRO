@@ -385,16 +385,12 @@ function saveDB(){
 function loadDB(){
   try{
     var s=localStorage.getItem('tvc_db');
-    if(s){var parsed=JSON.parse(s);
-      // Merge: add any products/months from localStorage not in initial data
-      Object.keys(parsed.products).forEach(function(p){
-        if(!DB.products[p])DB.products[p]=parsed.products[p];
-        else{
-          Object.keys(parsed.products[p].months||{}).forEach(function(m){
-            if(!DB.products[p].months[m])DB.products[p].months[m]=parsed.products[p].months[m];
-          });
-        }
-      });
+    if(s){
+      var parsed=JSON.parse(s);
+      // localStorage-first: completely replace DB with localStorage data
+      if(parsed&&parsed.products&&Object.keys(parsed.products).length){
+        DB=parsed;
+      }
     }
   }catch(e){}
 }
