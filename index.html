@@ -85,6 +85,14 @@ tr.cl:hover td{background:var(--bl)}
 .stag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
 .stag.ok{background:var(--gl);color:var(--grn)}.stag.er{background:var(--cl);color:var(--cor)}
 .empty{text-align:center;padding:32px;color:var(--ink3);font-size:13px}
+.dur-btns{display:flex;gap:4px;align-items:center}
+.dur-btn{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid var(--bd);background:transparent;color:var(--ink2);cursor:pointer;transition:.15s}
+.dur-btn.on{border-color:var(--blue);background:var(--bl);color:var(--blue);font-weight:600}
+.dur-btn:hover:not(.on){border-color:var(--ink3)}
+.dur-btns{display:flex;gap:4px;align-items:center}
+.dur-btn{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid var(--bd);background:transparent;color:var(--ink2);cursor:pointer;transition:.15s}
+.dur-btn.on{border-color:var(--blue);background:var(--bl);color:var(--blue);font-weight:600}
+.dur-btn:hover:not(.on){border-color:var(--ink3)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -128,6 +136,8 @@ tr.cl:hover td{background:var(--bl)}
 <!-- MATERIAL -->
 <div id="p-mt" class="panel">
   <div class="frow">
+    <div id="dur-mt"></div>
+    <div class="sep"></div>
     <div class="fg"><label>素材</label><select id="s-mt" onchange="rMt()"><option value="">全部</option></select></div>
     <div class="sep"></div>
     <div class="fg"><label>排序</label>
@@ -136,7 +146,7 @@ tr.cl:hover td{background:var(--bl)}
         <option value="tc">來電數</option><option value="o">訂單數</option>
       </select>
     </div>
-    <button class="rbtn" onclick="rset('s-mt','');rset('s-mm','s');rMt()">↺ 重設</button>
+    <button class="rbtn" onclick="durFilter='';setDur('','mt');rset('s-mt','');rset('s-mm','s');rMt()">↺ 重設</button>
     <span id="fh-mt" class="fhint" style="display:none"></span>
   </div>
   <div class="g2">
@@ -151,8 +161,10 @@ tr.cl:hover td{background:var(--bl)}
   <div class="frow" style="flex-direction:column;align-items:flex-start">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <select id="s-ch" style="display:none"><option value="">全部</option></select>
+      <div id="dur-ch"></div>
+      <div class="sep"></div>
       <div class="fg"><label>素材篩選</label><select id="s-chm" onchange="updChSel();buildChkList();rCh()"><option value="">全部</option></select></div>
-      <button class="rbtn" onclick="rset('s-chm','');selCCs=[];updChSel();buildChkList();rCh()">↺ 重設全部</button>
+      <button class="rbtn" onclick="durFilter='all';rset('s-chm','');selCCs=[];updChSel();buildChkList();rebuildSelects();rCh()">↺ 重設全部</button>
       <span id="fh-ch" class="fhint" style="display:none"></span>
     </div>
     <div id="ms-wrap" style="width:100%"></div>
@@ -181,10 +193,12 @@ tr.cl:hover td{background:var(--bl)}
 <!-- TREND -->
 <div id="p-tr" class="panel">
   <div class="frow">
+    <div id="dur-tr"></div>
+    <div class="sep"></div>
     <div class="fg"><label>素材</label><select id="s-trm" onchange="updTrChSel();rTr()"><option value="">全部</option></select></div>
     <div class="sep"></div>
     <div class="fg"><label>頻道</label><select id="s-trc" onchange="rTr()"><option value="">全部</option></select></div>
-    <button class="rbtn" onclick="rset('s-trm','');rset('s-trc','');updTrChSel();rTr()">↺ 重設</button>
+    <button class="rbtn" onclick="durFilter='';setDur('','tr');rset('s-trm','');rset('s-trc','');updTrChSel();rTr()">↺ 重設</button>
   </div>
   <div class="cc">
     <h3>每日投遞 / TVR / 來電 / 訂單</h3>
@@ -202,7 +216,10 @@ tr.cl:hover td{background:var(--bl)}
 <div id="p-im" class="panel">
   <div style="max-width:700px">
     <div class="cc" style="margin-bottom:12px">
-      <h3>已載入資料</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h3 style="margin-bottom:0">已載入資料</h3>
+        <button onclick="resetCache()" style="font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid var(--bd);background:var(--bg);color:var(--ink2);cursor:pointer" title="清除瀏覽器快取，回到系統預設資料">🗑 清除快取</button>
+      </div>
       <div id="im-status-wrap"></div>
     </div>
     <div class="cc" style="margin-bottom:12px">
@@ -372,6 +389,55 @@ function buildChkList(){
     +grpBtns+count+'</div>'
     +'<div style="display:flex;flex-wrap:wrap;max-height:140px;overflow-y:auto">'+chks+'</div>';
 }
+
+// ============================================================
+// DURATION FILTER (300s / 60s)
+// ============================================================
+var durFilter = ''; // '' = all, '300' = 300s, '60' = 60s
+
+function isDur(mat, dur){
+  if(!dur) return true;
+  if(dur==='300') return mat.slice(-1)==='5';
+  if(dur==='60')  return mat.slice(-1)==='1';
+  return true;
+}
+
+function setDur(dur, scope){
+  durFilter = dur;
+  // Update button states for this scope
+  ['','300','60'].forEach(function(d){
+    var el=document.getElementById('dur-'+d+'-'+scope);
+    if(el) el.classList.toggle('on', dur===d);
+  });
+  // Rebuild material selects for this scope
+  rebuildMatSel(scope);
+  // Re-render
+  if(scope==='mt') rMt();
+  else if(scope==='ch'){buildChkList();rCh();}
+  else if(scope==='tr') rTr();
+}
+
+function rebuildMatSel(scope){
+  var ids={'mt':'s-mt','ch':'s-chm','tr':'s-trm'};
+  var id=ids[scope];
+  var el=document.getElementById(id);
+  if(!el) return;
+  var prev=el.value;
+  var mats=getMats().filter(function(m){return isDur(m,durFilter);});
+  el.innerHTML='<option value="">全部</option>';
+  mats.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=sn(m);el.appendChild(o);});
+  el.value=(mats.indexOf(prev)>=0)?prev:'';
+}
+
+function durBtns(scope){
+  return '<div class="dur-btns">'
+    +'<label style="font-size:10px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">秒數</label>'
+    +'<button id="dur--'+scope+'" class="dur-btn on" onclick="setDur(\'\',\''+scope+'\')">全部</button>'
+    +'<button id="dur-300-'+scope+'" class="dur-btn" onclick="setDur(\'300\',\''+scope+'\')">300s</button>'
+    +'<button id="dur-60-'+scope+'" class="dur-btn" onclick="setDur(\'60\',\''+scope+'\')">60s</button>'
+    +'</div>';
+}
+
 // ============================================================
 // DATA STORE
 // ============================================================
@@ -398,6 +464,7 @@ function loadDB(){
 // STATE
 // ============================================================
 var curProd='EX', curMonth='all', curTab='ov';
+var durFilter='all'; // 'all','300','60'
 var CH={};  // chart registry
 var PAL=['#2563eb','#0d9488','#d97706','#dc2626','#7c3aed','#16a34a','#0891b2','#be185d','#92400e','#1e3a5f'];
 var PAA=PAL.map(function(c){return c+'bb';});
@@ -498,7 +565,7 @@ function getDates(){
 }
 function getMats(){
   var d=getMerged(); if(!d)return [];
-  return Object.keys(d.matTotals||{}).sort();
+  return Object.keys(d.matTotals||{}).sort().filter(function(m){return isDur(m,durFilter);});
 }
 
 // Phone map for current product
@@ -561,12 +628,14 @@ function updTrChSel(){fillChSel('s-trc',getCCs(document.getElementById('s-trm').
 function rebuildSelects(){
   var mats=getMats();
   var allCCs=getCCs('');
+  var matMap={'s-mt':'mt','s-trm':'tr','s-chm':'ch'};
   ['s-mt','s-trm','s-chm'].forEach(function(id){
     var el=document.getElementById(id);if(!el)return;
     var prev=el.value;
+    var filtered=mats.filter(function(m){return isDur(m,durFilter);});
     el.innerHTML='<option value="">全部</option>';
-    mats.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=sn(m);el.appendChild(o);});
-    el.value=(mats.indexOf(prev)>=0)?prev:'';
+    filtered.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=sn(m);el.appendChild(o);});
+    el.value=(filtered.indexOf(prev)>=0)?prev:'';
   });
   selCCs=[];
   fillChSel('s-trc',allCCs,'');
@@ -635,6 +704,9 @@ function jumpMat(m){rset('s-mt',m);go('mt');}
 // MATERIAL
 // ============================================================
 function rMt(){
+  var el=document.getElementById('dur-mt');if(el)el.innerHTML=durBtns('mt');
+  // Restore active state
+  var db=document.getElementById('dur-'+durFilter+'-mt');if(db)db.classList.add('on');
   var d=getMerged();if(!d){document.getElementById('t-mt').innerHTML='<tr><td class="empty">無資料</td></tr>';return;}
   var selM=document.getElementById('s-mt').value;
   var sk=document.getElementById('s-mm').value||'s';
@@ -668,6 +740,8 @@ function togMat(m){var s=document.getElementById('s-mt');s.value=(s.value===m?''
 // CHANNEL
 // ============================================================
 function rCh(){
+  var el=document.getElementById('dur-ch');if(el)el.innerHTML=durBtns('ch');
+  var db=document.getElementById('dur-'+durFilter+'-ch');if(db)db.classList.add('on');
   var d=getMerged();if(!d){document.getElementById('t-ch').innerHTML='<tr><td class="empty">無資料</td></tr>';return;}
   var selC=document.getElementById('s-ch').value;
   var selM=document.getElementById('s-chm').value;
@@ -694,11 +768,24 @@ function rCh(){
     mc('am','累計 TVR',totalTVR.toFixed(1),selCCs.length?'已選'+selCCs.length+'頻道':'全部頻道')+
     mc('co','TVR/檔',totalS>0?r2(totalTVR/totalS).toFixed(3):'0','平均每檔收視')+
     mc('gr','來電數',ct.tc.toLocaleString(),selM?sn(selM):'全部素材');
-  var cDay=callsByDay(selM);
+  // Compute calls filtered by durFilter
+  var cDay;
+  if(!selM && durFilter!=='all'){
+    var filtMats=getMats(); // already filtered by durFilter
+    var mp2=getMP();
+    cDay=getDates().map(function(dt){
+      return filtMats.reduce(function(a,mat){
+        var ph=mp2[mat]; return a+(ph&&d.dailyCalls[dt]?d.dailyCalls[dt][ph]||0:0);
+      },0);
+    });
+  } else {
+    cDay=callsByDay(selM);
+  }
   var dds=[];
   document.getElementById('h-ch-d').textContent=selCCs.length?(selCCs.length===1?(cc2n[selCCs[0]]||selCCs[0]):'已選'+selCCs.length+'頻道')+' 每日投遞 / TVR / 來電':'全部頻道每日投遞 / TVR / 來電';
-  // Aggregate spots and TVR across selected (or all) channels
-  var aggCCs=selCCs.length?selCCs:Object.keys(cc2n);
+  // Aggregate spots and TVR across selected (or filtered) channels
+  var filteredCCs=Object.keys(chData);
+  var aggCCs=selCCs.length?selCCs:filteredCCs;
   var spAgg=dates.map(function(dt){return aggCCs.reduce(function(a,cc){return a+((d.dailyCC[dt]&&d.dailyCC[dt][cc]&&d.dailyCC[dt][cc].s)||0);},0);});
   var tvrAgg=dates.map(function(dt){return r2(aggCCs.reduce(function(a,cc){return a+((d.dailyCC[dt]&&d.dailyCC[dt][cc]&&d.dailyCC[dt][cc].tvr)||0);},0));});
   dds=[
@@ -713,7 +800,7 @@ function rCh(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:scOpt,interaction:{mode:'index',intersect:false}}});
   var BANDS=['02-06','06-09','09-12','12-15','15-18','18-21','21-25'];
   var td={};BANDS.forEach(function(b){td[b]={s:0,tvr:0};});
-  var ccsT=selCCs.length?selCCs:chRows.map(function(r){return r[0];});
+  var ccsT=selCCs.length?selCCs:filteredCCs;
   ccsT.forEach(function(cc){var tc=d.timeCC[cc]||{};BANDS.forEach(function(b){if(tc[b]){td[b].s+=tc[b].s;td[b].tvr+=tc[b].tvr;}});});
   var tcData={};BANDS.forEach(function(b){tcData[b]=0;});
   ccsT.forEach(function(cc){var tc=(d.timeCalls&&d.timeCalls.cc&&d.timeCalls.cc[cc])||{};BANDS.forEach(function(b){tcData[b]+=(tc[b]||0);});});
@@ -765,6 +852,8 @@ function rProgTables(selC,selM){
 // TREND
 // ============================================================
 function rTr(){
+  var el=document.getElementById('dur-tr');if(el)el.innerHTML=durBtns('tr');
+  var db=document.getElementById('dur-'+durFilter+'-tr');if(db)db.classList.add('on');
   var d=getMerged();if(!d)return;
   var selM=document.getElementById('s-trm').value;
   var selCC=document.getElementById('s-trc').value;
@@ -772,9 +861,19 @@ function rTr(){
   var spotsArr=dates.map(function(dt){
     if(selCC)return(d.dailyCC[dt]&&d.dailyCC[dt][selCC]&&d.dailyCC[dt][selCC].s)||0;
     if(selM)return(d.dailyMat[dt]&&d.dailyMat[dt][selM])||0;
-    return getMats().reduce(function(a,m){return a+((d.dailyMat[dt]&&d.dailyMat[dt][m])||0);},0);
+    return getMats().reduce(function(a,m){return a+((d.dailyMat[dt]&&d.dailyMat[dt][m])||0);},0); // getMats() already filtered by durFilter
   });
-  var tvrArr=dates.map(function(dt){var dcc=d.dailyCC[dt]||{};var ccs=selCC?[selCC]:Object.keys(dcc);return r2(ccs.reduce(function(a,cc){return a+(dcc[cc]?dcc[cc].tvr:0);},0));});
+  var tvrArr=dates.map(function(dt){
+    var dcc=d.dailyCC[dt]||{};
+    if(selCC){return r2(dcc[selCC]?dcc[selCC].tvr:0);}
+    if(durFilter==='all'){return r2(Object.keys(dcc).reduce(function(a,cc){return a+(dcc[cc]?dcc[cc].tvr:0);},0));}
+    // For duration filter: sum TVR only from channels that carry filtered mats
+    var filtMats=getMats();
+    var n2cc2=getN2CC();
+    var filtCCs=new Set();
+    filtMats.forEach(function(m){Object.keys(d.chMat[m]||{}).forEach(function(ch){var cc=n2cc2[ch];if(cc)filtCCs.add(cc);});});
+    return r2([...filtCCs].reduce(function(a,cc){return a+(dcc[cc]?dcc[cc].tvr:0);},0));
+  });
   var callsArr=callsByDay(selM);
   var mp=getMP();
   var ordArr=dates.map(function(dt){var dc=d.dailyCalls[dt]||{};if(selM){var p=mp[selM];var cm=d.callMat[p];if(p&&cm&&cm.tc>0)return Math.round((dc[p]||0)*(cm.o/cm.tc));}return Object.keys(getPhoneMap()).reduce(function(a,p){var cm=d.callMat[p];if(cm&&cm.tc>0)return a+Math.round((dc[p]||0)*(cm.o/cm.tc));return a;},0);});
@@ -799,6 +898,11 @@ function rTr(){
 // ============================================================
 // IMPORT
 // ============================================================
+function resetCache(){
+  if(!confirm('確定清除快取？資料將回到系統預設狀態，匯入的資料會消失。'))return;
+  localStorage.removeItem('tvc_db');
+  location.reload();
+}
 function delMonth(pk,mo){
   if(!confirm('確定刪除 '+DB.products[pk].name+' '+fmtMonth(mo)+' 的資料？'))return;
   if(DB.products[pk]&&DB.products[pk].months[mo]){
